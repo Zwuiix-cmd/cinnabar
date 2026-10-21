@@ -2,7 +2,9 @@ use super::*;
 use ::protocol::test_support::recipes::{
     CraftingDataFixture, IngredientFixture, OutputFixture, RecipeFixture,
 };
-use ::protocol::{CreativeCategory, CreativeGroup, CreativeItem, ItemRegistryVersion};
+use ::protocol::{
+    CreativeCategory, CreativeGroup, CreativeItem, ItemComponents, ItemRegistryVersion,
+};
 
 fn entry(network_id: i32, identifier: &str, tags: &[&str]) -> ItemRegistryEntry {
     ItemRegistryEntry {
@@ -15,6 +17,16 @@ fn entry(network_id: i32, identifier: &str, tags: &[&str]) -> ItemRegistryEntry 
         negotiated_max_stack_size: (network_id == 3).then_some(16),
         canonical_empty_component_data: true,
         item_tags: tags.iter().map(|tag| Arc::from(*tag)).collect(),
+    }
+}
+
+fn categorized_entry(network_id: i32, identifier: &str, category: u8) -> ItemRegistryEntry {
+    ItemRegistryEntry {
+        components: Some(Arc::new(ItemComponents {
+            creative_category: Some(category),
+            ..ItemComponents::default()
+        })),
+        ..entry(network_id, identifier, &[])
     }
 }
 
@@ -205,6 +217,45 @@ fn items_follow_creative_order_then_the_rest_of_the_registry() {
     let pearl = data.lookup(&key("minecraft:ender_pearl", 0)).unwrap();
     assert_eq!((pearl.max_stack, pearl.category), (16, None));
     assert_eq!(data.items[3].max_stack, 64);
+}
+
+#[test]
+fn registry_only_custom_items_keep_their_declared_creative_categories() {
+    let registry = Arc::new(
+        [
+            categorized_entry(8, "iridia:custom_block", 1),
+            categorized_entry(9, "iridia:custom_item", 4),
+        ]
+        .into_iter()
+        .map(|entry| (entry.network_id, entry))
+        .collect(),
+    );
+    let creative = ::protocol::CreativeContentEvent {
+        groups: Arc::from([]),
+        items: Arc::from([]),
+        skipped: 0,
+    };
+    let mut cache = SessionDataCache::default();
+    let data = cache.update(
+        SessionInputs {
+            creative: Some(&creative),
+            registry: Some(&registry),
+            catalog: None,
+            language: [0; 3],
+        },
+        &name,
+    );
+
+    assert_eq!(
+        data.lookup(&key("iridia:custom_block", 0))
+            .and_then(|item| item.category),
+        Some(Category::Construction)
+    );
+    assert_eq!(
+        data.lookup(&key("iridia:custom_item", 0))
+            .and_then(|item| item.category),
+        Some(Category::Items)
+    );
 }
 
 #[test]
