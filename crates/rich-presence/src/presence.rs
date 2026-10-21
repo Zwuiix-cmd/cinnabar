@@ -74,10 +74,9 @@ impl Presence {
             client.on_activity_join(move |context| {
                 if let EventData::ActivityJoin(event) = context.event
                     && let Some(address) = event.secret.as_deref().and_then(join::join_address)
+                    && join_gate.load(Ordering::Relaxed)
                 {
-                    if join_gate.load(Ordering::Relaxed) {
-                        let _ = accepted.send(address.to_owned());
-                    }
+                    let _ = accepted.send(address.to_owned());
                 }
             }),
             client.on_activity_join_request(move |context| {
@@ -88,10 +87,9 @@ impl Presence {
                             name: user.username.unwrap_or_default(),
                         })
                     })
+                    && request_gate.load(Ordering::Relaxed)
                 {
-                    if request_gate.load(Ordering::Relaxed) {
-                        let _ = asked.send(request);
-                    }
+                    let _ = asked.send(request);
                 }
             }),
         ];
