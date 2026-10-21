@@ -373,10 +373,11 @@ impl HudEditor {
         if self.view.hovered.as_deref() != hovered {
             self.data_dirty = true;
             self.view.hovered = hovered.map(str::to_owned);
-            self.hovered = hit
-                .and_then(|hit| card_action_index(hit.pressed.as_deref()?))
-                .and_then(|index| self.draft.cards.get(index))
-                .map(|card| card.id.clone());
+        }
+        let hovered_card = hit.and_then(|hit| card_action_index(hit.pressed.as_deref()?));
+        if self.hovered != hovered_card {
+            self.data_dirty = true;
+            self.hovered = hovered_card;
         }
         if pressed {
             self.data_dirty = true;

@@ -183,10 +183,9 @@ impl HudEditor {
         }
     }
 
-    /// Index of the hovered card, tracked by ID so frame rebuilds and reordering keep it.
+    /// Hovered card index, independent of the retained frame so rebuilds keep the outline.
     fn hovered_card(&self) -> Option<usize> {
-        let id = self.hovered.as_ref()?;
-        self.draft.cards.iter().position(|card| &card.id == id)
+        self.hovered.filter(|index| *index < self.draft.cards.len())
     }
 
     /// Names the hovered widget or current selection without placing labels over nearby cards.

@@ -470,3 +470,55 @@ fn hovered_outline_survives_text_plate_remeasurement_and_rebuilds() {
     assert!(!Arc::ptr_eq(&catalog, editor.catalog.as_ref().unwrap()));
     assert_eq!(bound(&ui), Some(Scalar::Json(serde_json::json!(outline()))));
 }
+
+/// A card replaced under a still pointer is outlined on the next pointer event over the same key.
+#[test]
+fn hovered_outline_follows_a_card_replaced_under_the_pointer() {
+    let engine = engine();
+    let font = ui_engine::test_support::fixture_font();
+    let mut layouts = ui::TextLayoutCache::new(64, 1 << 24);
+    let mut ui = ModUi::default();
+    let card = |id: &str| ui::mod_hud::Card {
+        id: id.into(),
+        position: Some([0.5, 0.5]),
+        ..Default::default()
+    };
+    painted(&mut ui, &engine, &font, &mut layouts, vec![card("a")]);
+    let editor = ui.mod_hud_editor.as_ref().unwrap();
+    let frame = editor.frame.as_ref().unwrap();
+    let hit = frame
+        .hits
+        .iter()
+        .find(|hit| hit.pressed.as_deref() == Some("hud.card:0"))
+        .unwrap();
+    let at = [
+        (hit.rect.x + hit.rect.w * 0.5) as f32 * frame.scale + frame.origin[0],
+        (hit.rect.y + hit.rect.h * 0.5) as f32 * frame.scale + frame.origin[1],
+    ];
+    let hover = |ui: &mut ModUi| {
+        ui.mod_hud_editor
+            .as_mut()
+            .unwrap()
+            .pointer(at, false, false, &mut [])
+    };
+    hover(&mut ui);
+    paint(&mut ui, &engine, &font, &mut layouts, 2.);
+    ui.update_mod_hud_editor(&Hud {
+        cards: vec![card("b")],
+        ..Default::default()
+    })
+    .unwrap();
+    paint(&mut ui, &engine, &font, &mut layouts, 3.);
+    hover(&mut ui);
+    paint(&mut ui, &engine, &font, &mut layouts, 4.);
+    assert_eq!(
+        ui.mod_hud_editor
+            .as_ref()
+            .unwrap()
+            .data
+            .global_value("#bounds_0_color"),
+        Some(&Scalar::Json(serde_json::json!(
+            ui::mod_hud::EditorStyle::default().outline
+        )))
+    );
+}

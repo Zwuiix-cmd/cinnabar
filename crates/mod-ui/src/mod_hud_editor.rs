@@ -70,8 +70,8 @@ pub(super) struct HudEditor {
     icons: Vec<IconRef>,
     keep_out: Vec<[f64; 4]>,
     selected: Option<usize>,
-    /// ID of the card whose bounds or resize handle the pointer is over.
-    hovered: Option<String>,
+    /// Card whose bounds or resize handle was under the pointer at its last event.
+    hovered: Option<usize>,
     pub(super) drag: Option<input::Drag>,
     slider: Option<slider::Gesture>,
     /// `(control index, fill)` for every guest slider, as last published.
