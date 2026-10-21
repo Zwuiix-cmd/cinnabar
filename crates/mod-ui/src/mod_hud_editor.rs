@@ -70,6 +70,8 @@ pub(super) struct HudEditor {
     icons: Vec<IconRef>,
     keep_out: Vec<[f64; 4]>,
     selected: Option<usize>,
+    /// ID of the card whose bounds or resize handle the pointer is over.
+    hovered: Option<String>,
     pub(super) drag: Option<input::Drag>,
     slider: Option<slider::Gesture>,
     /// `(control index, fill)` for every guest slider, as last published.
@@ -134,6 +136,7 @@ impl ModUi {
             icons: Vec::new(),
             keep_out: Vec::new(),
             selected: None,
+            hovered: None,
             drag: None,
             slider: None,
             control_fills: Vec::new(),
@@ -338,7 +341,6 @@ impl ModUi {
         let mut zones = feedback::KeepOutRenderer { rects: &keep_out };
         let mut renderers: [&mut dyn CustomRenderer; 3] = [&mut items, &mut glass, &mut zones];
         // Keep pointer feedback outside the editor borrow while measuring native hit bounds.
-        let hovered = editor.hovered_card();
         let view = std::mem::take(&mut editor.view);
         let art = ScreenArt {
             view: Some(&view),
@@ -358,7 +360,7 @@ impl ModUi {
                     for (n, card) in editor.draft.cards.iter().enumerate() {
                         crate::mod_widgets::text_plate::data(values, card, n, viewport);
                     }
-                    editor.write_geometry(values, hovered);
+                    editor.write_geometry(values);
                     editor.data = data;
                 }
                 if editor.catalog.is_none() {

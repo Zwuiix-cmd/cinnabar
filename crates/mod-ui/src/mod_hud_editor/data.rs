@@ -34,13 +34,12 @@ impl HudEditor {
         for &(index, fill) in &self.control_fills {
             data.set_global(format!("#row_{index}_fill"), Scalar::Num(fill));
         }
-        self.write_geometry(&mut data, self.hovered_card());
+        self.write_geometry(&mut data);
         data
     }
 
-    /// Shares displayed geometry and hidden-card filtering between paint and text measurement;
-    /// `hovered` comes from the caller because paint borrows the view state meanwhile.
-    pub(super) fn write_geometry(&mut self, data: &mut DataSource, hovered: Option<usize>) {
+    /// Shares displayed geometry and hidden-card filtering between paint and text measurement.
+    pub(super) fn write_geometry(&mut self, data: &mut DataSource) {
         data.set_global("#hud_dragging", Scalar::Bool(self.drag.is_some()));
         for axis in 0..2 {
             let guide = self.drag.as_ref().and_then(|drag| drag.guides[axis]);
@@ -56,6 +55,7 @@ impl HudEditor {
             );
         }
         let style = self.draft.editor_style.unwrap_or_default();
+        let hovered = self.hovered_card();
         for (index, card) in self.draft.cards.iter().enumerate() {
             let visible = !self.hidden.contains(&card.id);
             data.set_global(format!("#card_{index}_visible"), Scalar::Bool(visible));
@@ -183,28 +183,10 @@ impl HudEditor {
         }
     }
 
-    /// Card whose bounds or resize handle is under the pointer in the last painted frame.
-    pub(super) fn hovered_card(&self) -> Option<usize> {
-        let key = self.view.hovered.as_ref()?;
-        let action = self
-            .frame
-            .as_ref()?
-            .hits
-            .iter()
-            .find(|hit| &hit.key == key)?
-            .pressed
-            .as_deref()?;
-        action
-            .strip_prefix("hud.card:")
-            .and_then(|index| index.parse().ok())
-            .or_else(|| {
-                action
-                    .strip_prefix("hud.resize:")?
-                    .split_once(':')?
-                    .0
-                    .parse()
-                    .ok()
-            })
+    /// Index of the hovered card, tracked by ID so frame rebuilds and reordering keep it.
+    fn hovered_card(&self) -> Option<usize> {
+        let id = self.hovered.as_ref()?;
+        self.draft.cards.iter().position(|card| &card.id == id)
     }
 
     /// Names the hovered widget or current selection without placing labels over nearby cards.

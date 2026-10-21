@@ -410,9 +410,9 @@ fn card_outlines_follow_hover_and_selection_without_rebuilding() {
     ));
 }
 
-/// A hovered text plate keeps its outline when live content changes its measured size.
+/// A hovered text plate keeps its outline through live remeasurement and template rebuilds.
 #[test]
-fn hovered_outline_survives_text_plate_remeasurement() {
+fn hovered_outline_survives_text_plate_remeasurement_and_rebuilds() {
     let engine = engine();
     let font = ui_engine::test_support::fixture_font();
     let mut layouts = ui::TextLayoutCache::new(64, 1 << 24);
@@ -454,5 +454,19 @@ fn hovered_outline_survives_text_plate_remeasurement() {
     hud.cards[0].rows[0].value = "123456".into();
     ui.update_mod_hud_editor(&hud).unwrap();
     paint(&mut ui, &engine, &font, &mut layouts, 3.);
+    assert_eq!(bound(&ui), Some(Scalar::Json(serde_json::json!(outline()))));
+    let catalog = Arc::clone(
+        ui.mod_hud_editor
+            .as_ref()
+            .unwrap()
+            .catalog
+            .as_ref()
+            .unwrap(),
+    );
+    hud.cards[0].text_plate.as_mut().unwrap().style.radius = 4.;
+    ui.update_mod_hud_editor(&hud).unwrap();
+    paint(&mut ui, &engine, &font, &mut layouts, 4.);
+    let editor = ui.mod_hud_editor.as_ref().unwrap();
+    assert!(!Arc::ptr_eq(&catalog, editor.catalog.as_ref().unwrap()));
     assert_eq!(bound(&ui), Some(Scalar::Json(serde_json::json!(outline()))));
 }
