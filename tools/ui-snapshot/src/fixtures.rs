@@ -776,6 +776,16 @@ const STATES: &[State] = &[
         fixture: || settings_general_toggle(SettingId::EcomodeToggle),
     },
     State {
+        name: "settings-discord",
+        size: [1280, 900],
+        gui_scale: GUI_SCALE,
+        fixture: || {
+            Fixture::Menu(Box::new(settings(
+                SettingSection::Discord.definition().name,
+            )))
+        },
+    },
+    State {
         name: "settings-updates",
         size: SIZE,
         gui_scale: GUI_SCALE,
