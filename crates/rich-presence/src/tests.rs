@@ -291,7 +291,7 @@ fn server_transfers_publish_once_and_menu_discards_the_destination() {
     assert!(!publication.changed(State::Playing, 1, Some(&second), None, 0));
     assert!(publication.changed(State::Playing, 2, Some(&second), None, 0));
     assert!(publication.changed(State::Menus, 2, None, None, 0));
-    assert!(publication.last.unwrap().2.is_none());
+    assert!(publication.last.unwrap().target.is_none());
 }
 
 #[test]
