@@ -106,12 +106,14 @@ fn admit(
                 runtime.queue.entries.pop_front();
             }
             Work::Predicted { tick, payload } => {
+                let creative_destroy = payload.creative_destroy;
                 if movement.unsent_sample_at(tick).is_none()
                     || !movement.attach_survival_mining(tick, *payload)
                 {
                     break;
                 }
                 mining.carried_prediction(movement.completed_tick());
+                mining.queue_creative_destroy(creative_destroy);
                 runtime.queue.entries.front_mut().unwrap().work = Work::Carrying { tick };
             }
             Work::Start {
@@ -133,12 +135,20 @@ fn admit(
                     .as_ref()
                     .map(|request| request.request_id());
                 let broken = payload.broken;
+                let creative_destroy = payload.creative_destroy;
                 let swing = payload.swing;
                 if !movement.attach_survival_mining(tick, payload) {
                     result.cancelled_mining_requests.extend(request);
                     break;
                 }
-                mining.commit_press(machine, tick, movement.completed_tick(), &target, broken);
+                mining.commit_press(
+                    machine,
+                    tick,
+                    movement.completed_tick(),
+                    &target,
+                    broken,
+                    creative_destroy,
+                );
                 if swing && swings.try_swing(tick, (effects.swing_duration)(tick)) {
                     let _ = (effects.send)(vec![protocol::swing_arm_packet(
                         frame.local_runtime_id,

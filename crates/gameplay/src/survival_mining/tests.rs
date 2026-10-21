@@ -512,6 +512,50 @@ fn a_completion_predicts_the_break_and_a_rolled_back_block_is_mined_again() {
 }
 
 #[test]
+fn an_instant_destroy_carries_the_creative_player_action() {
+    let target = DestroyTarget {
+        instant: true,
+        ..target([3, 4, 5], "minecraft:stone", None)
+    };
+    for authority in [Server, Client] {
+        let payload = held(&mut DestroyMachine::default(), &target, authority);
+        assert_eq!(
+            payload.creative_destroy,
+            Some(CreativeDestroyBlock {
+                position: target.position,
+                face: target.face,
+            })
+        );
+    }
+}
+
+#[test]
+fn an_admitted_creative_destroy_queues_its_player_action_once() {
+    let target = DestroyTarget {
+        instant: true,
+        ..target([3, 4, 5], "minecraft:stone", None)
+    };
+    let mut ticker = ticker_with_ticks(1);
+    let mut runtime = SurvivalMiningRuntime::default();
+    runtime.step_ticks(
+        &mut ticker,
+        DestroyInput::Held(Some(&target)),
+        Server,
+        |_| {},
+        |_, _| None,
+        |_| {},
+    );
+    assert_eq!(
+        runtime.take_creative_destroy_actions(),
+        [CreativeDestroyBlock {
+            position: target.position,
+            face: target.face,
+        }]
+    );
+    assert!(runtime.take_creative_destroy_actions().is_empty());
+}
+
+#[test]
 fn interruption_aborts_on_the_next_step_only() {
     let stone = target([7, 7, 7], "minecraft:stone", None);
     let mut machine = DestroyMachine::default();

@@ -350,6 +350,29 @@ fn maintain_attacks(
     for request in admitted.cancelled_mining_requests {
         player.inventory.ledger_mut().cancel_mining_request(request);
     }
+    if local_runtime_id != 0 {
+        let creative_destroy_actions = mining.take_creative_destroy_actions();
+        let creative_destroy_packets = creative_destroy_actions
+            .iter()
+            .map(|action| {
+                protocol::creative_destroy_block_packet(
+                    local_runtime_id,
+                    action.position,
+                    action.face,
+                )
+            })
+            .collect();
+        if network
+            .send_inventory_packets(creative_destroy_packets)
+            .is_err()
+        {
+            for action in creative_destroy_actions {
+                mining.queue_creative_destroy(Some(action));
+            }
+        }
+    } else {
+        let _ = mining.take_creative_destroy_actions();
+    }
     for cue in mining.take_break_cues() {
         let gameplay::survival_mining::BlockBreakCue::Break {
             position,

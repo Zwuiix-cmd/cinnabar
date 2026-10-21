@@ -75,6 +75,13 @@ pub struct ToolWear {
     pub break_damage: i32,
 }
 
+/// The standalone `PlayerAction` emitted for an instant creative destroy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CreativeDestroyBlock {
+    pub position: [i32; 3],
+    pub face: u8,
+}
+
 impl DestroyTarget {
     /// Computes the current per-tick progress in the client's float precision.
     fn rate(&self, on_ground: bool) -> f32 {
@@ -94,6 +101,8 @@ impl DestroyTarget {
 pub struct SurvivalTickPayload {
     pub actions: BlockActions,
     pub destroy: Option<DestroyTarget>,
+    /// The standalone creative action that belongs to this completed destroy.
+    pub creative_destroy: Option<CreativeDestroyBlock>,
     /// Holding attack on a block attempts a mining swing every tick.
     pub swing: bool,
     /// `(slot, predicted damage, stack network id)` of a worn held tool.
@@ -106,7 +115,10 @@ pub struct SurvivalTickPayload {
 
 impl SurvivalTickPayload {
     pub fn is_empty(&self) -> bool {
-        self.actions.is_empty() && self.destroy.is_none() && self.mine_block.is_none()
+        self.actions.is_empty()
+            && self.destroy.is_none()
+            && self.creative_destroy.is_none()
+            && self.mine_block.is_none()
     }
 
     /// Faces, percents, hit offsets and slots are bounded at their sources, so
@@ -203,8 +215,8 @@ impl Destroying {
 /// Server authority: start, then silence while cracking, a continue on a new
 /// block, and continue plus predict on completion; aborts carry progress.
 /// Client authority: start, a crack every tick, and a stop plus item-use
-/// destroy transaction on completion. An instant destroy completes on its start
-/// tick with the same completion actions, then repeats while held.
+/// destroy transaction on completion. Instant creative destroys also carry the
+/// standalone creative player action on both authority paths.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DestroyMachine {
     destroying: Option<Destroying>,
@@ -388,6 +400,12 @@ impl DestroyMachine {
                 payload.destroy = Some(target.clone());
             }
         }
+        if target.instant {
+            payload.creative_destroy = Some(CreativeDestroyBlock {
+                position: target.position,
+                face: target.face,
+            });
+        }
         self.destroying = Some(Destroying {
             position: target.position,
             face: target.face,
@@ -409,6 +427,7 @@ pub struct SurvivalMiningRuntime {
     position_authority: Option<(SessionGeneration, PositionAuthorityGeneration)>,
     last_blocked_log_millis: Option<u64>,
     break_cues: Vec<BlockBreakCue>,
+    creative_destroy_actions: Vec<CreativeDestroyBlock>,
 }
 
 impl SurvivalMiningRuntime {
@@ -420,6 +439,11 @@ impl SurvivalMiningRuntime {
     /// Takes local destroy effects after their block actions were attached to a tick.
     pub fn take_break_cues(&mut self) -> Vec<BlockBreakCue> {
         std::mem::take(&mut self.break_cues)
+    }
+
+    /// Takes creative destroy actions after their movement carriers were admitted.
+    pub fn take_creative_destroy_actions(&mut self) -> Vec<CreativeDestroyBlock> {
+        std::mem::take(&mut self.creative_destroy_actions)
     }
 
     /// Steps every unsent tick once and retains its destroy work on that sample,
@@ -458,10 +482,12 @@ impl SurvivalMiningRuntime {
                 .as_ref()
                 .map(|request| request.request_id());
             let broken = payload.broken;
+            let creative_destroy = payload.creative_destroy;
             if payload.is_empty() && !maintaining && self.machine == DestroyMachine::default() {
                 continue;
             }
             if ticker.attach_survival_mining(tick, payload) {
+                self.queue_creative_destroy(creative_destroy);
                 broken.into_iter().for_each(&mut predict_break);
                 if let Some(position) = broken {
                     if let DestroyInput::Held(Some(target)) | DestroyInput::Continue(Some(target)) =
@@ -503,6 +529,7 @@ impl SurvivalMiningRuntime {
         completed_tick: u64,
         target: &DestroyTarget,
         broken: Option<[i32; 3]>,
+        creative_destroy: Option<CreativeDestroyBlock>,
     ) {
         self.machine = machine;
         self.last_stepped_tick = Some(if broken.is_some() {
@@ -510,6 +537,7 @@ impl SurvivalMiningRuntime {
         } else {
             tick
         });
+        self.queue_creative_destroy(creative_destroy);
         if let Some(position) = broken {
             self.break_cues.push(BlockBreakCue::Break {
                 position,
@@ -553,6 +581,13 @@ impl SurvivalMiningRuntime {
         self.last_stepped_tick = Some(completed_tick);
     }
 
+    /// Retains a creative action only after its movement carrier was admitted.
+    pub fn queue_creative_destroy(&mut self, action: Option<CreativeDestroyBlock>) {
+        if let Some(action) = action {
+            self.creative_destroy_actions.push(action);
+        }
+    }
+
     /// Reanchors tick tracking when session or position authority changes.
     /// Position changes interrupt active mining; session changes reset it entirely.
     pub fn synchronize(&mut self, identity: (SessionGeneration, PositionAuthorityGeneration)) {
@@ -561,6 +596,7 @@ impl SurvivalMiningRuntime {
             .filter(|previous| *previous != identity)
         {
             self.last_stepped_tick = None;
+            self.creative_destroy_actions.clear();
             if session == identity.0 {
                 self.machine.interrupt();
             } else {
