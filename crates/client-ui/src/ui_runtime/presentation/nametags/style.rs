@@ -17,7 +17,7 @@ pub(super) fn record_cost(style: Option<&ui::mod_hud::NametagStyle>, plate: bool
 pub(in crate::ui_runtime::presentation) fn style_scene(
     scene: &mut NametagScene,
     style: &ui::mod_hud::NametagStyle,
-    own_anchor: Option<[f32; 3]>,
+    own_actor: Option<u64>,
 ) {
     if style.hide {
         scene.records.clear();
@@ -79,7 +79,7 @@ pub(in crate::ui_runtime::presentation) fn style_scene(
                     }
                 }
             } else {
-                let own = own_anchor == Some(record.anchor);
+                let own = own_actor == Some(record.runtime_id);
                 let text_color = if own {
                     style.own_text_color.or(style.text_color)
                 } else {

@@ -625,6 +625,7 @@ pub fn build_nametag_scene<'p>(
         // that extend above the published actor bounds. Sneaking names still test depth.
         let common = NametagRecord {
             anchor: anchor.position.to_array(),
+            runtime_id: anchor.runtime_id,
             line_lift: EXTRA_LINE_LIFT
                 * (placed.len() + usize::from(separate)).saturating_sub(1) as f32,
             depth_tested: u32::from(anchor.depth_tested),
