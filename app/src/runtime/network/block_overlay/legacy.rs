@@ -107,25 +107,13 @@ impl TextureBindings {
         if components.geometry.is_some() {
             return;
         }
-        if let Some(materials) = self.materials_for(name) {
+        if let Some(materials) = self.materials.get(name).or_else(|| {
+            name.strip_prefix("minecraft:")
+                .and_then(|name| self.materials.get(name))
+        }) {
             components.materials = Some(materials.clone());
         }
     }
-
-    fn materials_for(&self, name: &str) -> Option<&Box<[CustomMaterialInstance]>> {
-        let bare = bare_name(name);
-        self.materials
-            .get(name)
-            .or_else(|| self.materials.get(bare))
-            .or_else(|| {
-                name.strip_prefix("minecraft:")
-                    .and_then(|name| self.materials.get(name))
-            })
-    }
-}
-
-fn bare_name(name: &str) -> &str {
-    name.rsplit_once(':').map_or(name, |(_, bare)| bare)
 }
 
 fn parse_textures(textures: &Value) -> Option<Box<[CustomMaterialInstance]>> {

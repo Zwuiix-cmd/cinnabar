@@ -71,6 +71,35 @@ fn geometry_component_keeps_terrain_texture_materials() {
     assert_eq!(face_color(&compiled.overlay, 0, BlockFace::Up), COLORS[7].1);
 }
 
+/// Custom identifiers keep their namespace; only vanilla identifiers have a bare alias.
+#[test]
+fn legacy_texture_bindings_do_not_alias_unrelated_custom_namespaces() {
+    let view = legacy_view(&[json!({
+        "brick": {"textures": "brick"},
+        "test:brick": {"textures": "other"},
+        "other:brick": {"textures": "up"}
+    })]);
+    let bindings = super::super::legacy::TextureBindings::new(&view);
+    for (name, expected) in [
+        ("test:brick", "other"),
+        ("other:brick", "up"),
+        ("missing:brick", "down"),
+        ("minecraft:brick", "brick"),
+        ("brick", "brick"),
+    ] {
+        let mut components = CustomVisualComponents {
+            materials: materials("down"),
+            ..Default::default()
+        };
+        bindings.apply(name, &mut components);
+        assert_eq!(
+            components.materials.as_ref().unwrap()[0].texture.as_ref(),
+            expected,
+            "{name}"
+        );
+    }
+}
+
 fn legacy_view(layers: &[Value]) -> LayeredPackView {
     let archives = layers
         .iter()
