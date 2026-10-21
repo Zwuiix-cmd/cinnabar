@@ -34,6 +34,8 @@ pub(in super::super) fn same_cards_shape(a: &[Card], b: &[Card]) -> bool {
                 && left.text_plate.is_some() == right.text_plate.is_some()
                 && left.text_plate.as_ref().map(|p| p.style.border_width)
                     == right.text_plate.as_ref().map(|p| p.style.border_width)
+                && left.text_plate.as_ref().map(|p| p.style.radius)
+                    == right.text_plate.as_ref().map(|p| p.style.radius)
                 && left.cells.len() == right.cells.len()
                 && left.cells.iter().zip(&right.cells).all(|(a, b)| {
                     a.rect == b.rect
