@@ -20,6 +20,7 @@ fn entry(network_id: i32, identifier: &str, tags: &[&str]) -> ItemRegistryEntry 
     }
 }
 
+/// Builds a registry entry with an advertised item category.
 fn categorized_entry(network_id: i32, identifier: &str, category: u8) -> ItemRegistryEntry {
     ItemRegistryEntry {
         components: Some(Arc::new(ItemComponents {
@@ -223,8 +224,8 @@ fn items_follow_creative_order_then_the_rest_of_the_registry() {
 fn registry_only_custom_items_keep_their_declared_creative_categories() {
     let registry = Arc::new(
         [
-            categorized_entry(8, "iridia:custom_block", 1),
-            categorized_entry(9, "iridia:custom_item", 4),
+            categorized_entry(8, "test:custom_block", 1),
+            categorized_entry(9, "test:custom_item", 4),
         ]
         .into_iter()
         .map(|entry| (entry.network_id, entry))
@@ -247,15 +248,71 @@ fn registry_only_custom_items_keep_their_declared_creative_categories() {
     );
 
     assert_eq!(
-        data.lookup(&key("iridia:custom_block", 0))
+        data.lookup(&key("test:custom_block", 0))
             .and_then(|item| item.category),
         Some(Category::Construction)
     );
     assert_eq!(
-        data.lookup(&key("iridia:custom_item", 0))
+        data.lookup(&key("test:custom_item", 0))
             .and_then(|item| item.category),
         Some(Category::Items)
     );
+}
+
+#[test]
+fn creative_groups_override_registry_categories_and_unknown_groups_fall_back() {
+    let registry = Arc::new(
+        [8, 9, 10]
+            .map(|id| categorized_entry(id, &format!("test:item_{id}"), 4))
+            .into_iter()
+            .map(|entry| (entry.network_id, entry))
+            .collect(),
+    );
+    let creative = ::protocol::CreativeContentEvent {
+        groups: Arc::from([
+            CreativeGroup {
+                category: CreativeCategory::Nature,
+                name: "".into(),
+                icon: None,
+            },
+            CreativeGroup {
+                category: CreativeCategory::Unknown(222),
+                name: "".into(),
+                icon: None,
+            },
+        ]),
+        items: [0, 1, 99]
+            .into_iter()
+            .enumerate()
+            .map(|(index, group)| CreativeItem {
+                creative_network_id: index as u32 + 1,
+                stack: stack(index as i32 + 8, 0),
+                group,
+            })
+            .collect(),
+        skipped: 0,
+    };
+    let mut cache = SessionDataCache::default();
+    let data = cache.update(
+        SessionInputs {
+            creative: Some(&creative),
+            registry: Some(&registry),
+            catalog: None,
+            language: [0; 3],
+        },
+        &name,
+    );
+    for (id, expected) in [
+        (8, Category::Nature),
+        (9, Category::Items),
+        (10, Category::Items),
+    ] {
+        assert_eq!(
+            data.lookup(&key(&format!("test:item_{id}"), 0))
+                .and_then(|item| item.category),
+            Some(expected)
+        );
+    }
 }
 
 #[test]
