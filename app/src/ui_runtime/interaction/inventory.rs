@@ -242,6 +242,7 @@ pub(super) fn apply_inventory_pointer(
         .and_then(|gui| presentation.engine_container_hit(gui))
         == Some(InventoryCellHit::Widget(Widget::Close));
     if primary_pressed {
+        runtime.screen_state_mut().container_scroll_drag = None;
         runtime.screen_state_mut().container_close_armed = on_close;
     }
     if runtime.screen_state().container_close_armed {

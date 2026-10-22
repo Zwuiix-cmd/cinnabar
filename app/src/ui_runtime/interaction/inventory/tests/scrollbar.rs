@@ -488,3 +488,34 @@ fn a_declined_track_press_still_handles_wheel_input() {
         Some(&20.0)
     );
 }
+
+#[test]
+fn a_cancelled_close_press_clears_an_older_scrollbar_capture() {
+    let mut player = client_state::PlayerRuntime(player_state::PlayerState::new(1));
+    let mut runtime = client_ui::test_support::inventory_session(&mut player);
+    runtime.toggle_inventory(&mut player, None);
+    runtime.observe_inventory_window(&player);
+    let presentation = presentation(&player, &runtime);
+    let close = control_point(&presentation, InventoryCellHit::Widget(Widget::Close));
+    runtime.screen_state_mut().container_scroll_drag = Some(("scroll".into(), 25.0));
+    let mut window = window(close);
+    pointer_edge(
+        &mut player,
+        &mut runtime,
+        &window,
+        &presentation,
+        true,
+        false,
+    );
+    window.set_cursor_position(Some(Vec2::new(1.0, 1.0)));
+    pointer_edge(
+        &mut player,
+        &mut runtime,
+        &window,
+        &presentation,
+        false,
+        true,
+    );
+    assert!(runtime.inventory_open());
+    assert!(runtime.screen_state().container_scroll_drag.is_none());
+}
