@@ -38,6 +38,8 @@ mod dragon_egg;
 mod end_rod;
 #[path = "tests/entity_particles.rs"]
 mod entity_particles;
+#[path = "tests/facing_cube.rs"]
+mod facing_cube;
 #[path = "tests/flowerbed.rs"]
 mod flowerbed;
 #[path = "tests/furnace.rs"]

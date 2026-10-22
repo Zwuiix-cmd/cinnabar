@@ -5,6 +5,7 @@ mod bodies;
 mod cape_tests;
 mod cloth_contacts;
 mod commit;
+mod companions;
 mod flames;
 mod geometry;
 mod hand_frame;
@@ -165,6 +166,11 @@ pub fn prepare_actor_render_frame(
         .step
         .expect("actor preparation precedes final rendering");
     let artwork = state.session_artwork.as_ref().unwrap_or(&params.artwork);
+    if let Some(equipment) = params.equipment.as_deref_mut() {
+        equipment.set_show_custom_item_models(
+            params.presentation.settings.feel().show_custom_item_models,
+        );
+    }
     let view = state.captured_view;
     let pose_view = bodies::PoseView {
         partial_tick: step.partial_tick,
@@ -294,6 +300,9 @@ pub fn prepare_actor_render_frame(
     }
     let camera_position = cull_view.map(|view| view.camera_position.to_array());
     // Remote bodies passed frame-model admission before bounded skin registration.
+    let hidden_companion_body = (!local_visible && !coverage_local)
+        .then(|| local.as_ref().map(|local| local.submission.clone()))
+        .flatten();
     let mut batch = select_actor_presentations(
         bodies.local_runtime_id,
         local_visible || coverage_local,
@@ -354,6 +363,8 @@ pub fn prepare_actor_render_frame(
         &mut params.scene,
         step.partial_tick,
         hats::AttachmentFrame {
+            collisions: client_world.collisions,
+            hidden_local: hidden_companion_body.as_ref(),
             geometries: &new_geometries,
             equipment: params.equipment.as_deref(),
             local_emote: bodies.local_emote_pose.as_ref(),
@@ -388,6 +399,7 @@ pub fn prepare_actor_render_frame(
         new_geometries,
         params.profiler.as_deref(),
     );
+    let independent_layers = state.hat_state.independent_layers(&batch);
     params.prepared.0 = Some(commit::PendingActorPublication::new(
         batch,
         step.partial_tick,
@@ -401,6 +413,7 @@ pub fn prepare_actor_render_frame(
         bodies.unrigged_actors,
     ));
     if let Some(pending) = params.prepared.0.as_mut() {
+        pending.independent_layers = independent_layers;
         pending.mask_only_runtime_ids = bodies.mask_only_runtime_ids;
         if !local_visible && coverage_local {
             pending.mask_only_runtime_ids.push(bodies.local_runtime_id);
