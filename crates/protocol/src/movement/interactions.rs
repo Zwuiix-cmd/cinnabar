@@ -1,7 +1,6 @@
 //! Interaction payloads carried inside one current `PlayerAuthInput`.
 //!
-//! The current client no longer sends block destruction through
-//! `PlayerAction` packets: the start, abort, continue, and local prediction of
+//! The start, abort, continue, and local prediction of
 //! a destroy travel as the block-action list of the movement tick in which
 //! they happened (`PerformBlockActions`). A creative instant destroy also uses
 //! the standalone `PlayerAction` packet; its embedded break-block item-use

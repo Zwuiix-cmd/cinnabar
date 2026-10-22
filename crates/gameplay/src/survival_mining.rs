@@ -51,6 +51,8 @@ impl BlockBreakingAuthority {
 /// The block under the crosshair and everything its destroy rate depends on.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DestroyTarget {
+    /// Actor identity captured with the target and retained through send retries.
+    pub local_runtime_id: u64,
     pub position: [i32; 3],
     pub face: u8,
     pub runtime_id: u32,
@@ -78,6 +80,7 @@ pub struct ToolWear {
 /// The standalone `PlayerAction` emitted for an instant creative destroy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CreativeDestroyBlock {
+    pub local_runtime_id: u64,
     pub position: [i32; 3],
     pub face: u8,
 }
@@ -402,6 +405,7 @@ impl DestroyMachine {
         }
         if target.instant {
             payload.creative_destroy = Some(CreativeDestroyBlock {
+                local_runtime_id: target.local_runtime_id,
                 position: target.position,
                 face: target.face,
             });
@@ -427,7 +431,6 @@ pub struct SurvivalMiningRuntime {
     position_authority: Option<(SessionGeneration, PositionAuthorityGeneration)>,
     last_blocked_log_millis: Option<u64>,
     break_cues: Vec<BlockBreakCue>,
-    creative_destroy_actions: Vec<CreativeDestroyBlock>,
 }
 
 impl SurvivalMiningRuntime {
@@ -439,11 +442,6 @@ impl SurvivalMiningRuntime {
     /// Takes local destroy effects after their block actions were attached to a tick.
     pub fn take_break_cues(&mut self) -> Vec<BlockBreakCue> {
         std::mem::take(&mut self.break_cues)
-    }
-
-    /// Takes creative destroy actions after their movement carriers were admitted.
-    pub fn take_creative_destroy_actions(&mut self) -> Vec<CreativeDestroyBlock> {
-        std::mem::take(&mut self.creative_destroy_actions)
     }
 
     /// Steps every unsent tick once and retains its destroy work on that sample,
@@ -482,12 +480,10 @@ impl SurvivalMiningRuntime {
                 .as_ref()
                 .map(|request| request.request_id());
             let broken = payload.broken;
-            let creative_destroy = payload.creative_destroy;
             if payload.is_empty() && !maintaining && self.machine == DestroyMachine::default() {
                 continue;
             }
             if ticker.attach_survival_mining(tick, payload) {
-                self.queue_creative_destroy(creative_destroy);
                 broken.into_iter().for_each(&mut predict_break);
                 if let Some(position) = broken {
                     if let DestroyInput::Held(Some(target)) | DestroyInput::Continue(Some(target)) =
@@ -529,7 +525,6 @@ impl SurvivalMiningRuntime {
         completed_tick: u64,
         target: &DestroyTarget,
         broken: Option<[i32; 3]>,
-        creative_destroy: Option<CreativeDestroyBlock>,
     ) {
         self.machine = machine;
         self.last_stepped_tick = Some(if broken.is_some() {
@@ -537,7 +532,6 @@ impl SurvivalMiningRuntime {
         } else {
             tick
         });
-        self.queue_creative_destroy(creative_destroy);
         if let Some(position) = broken {
             self.break_cues.push(BlockBreakCue::Break {
                 position,
@@ -581,13 +575,6 @@ impl SurvivalMiningRuntime {
         self.last_stepped_tick = Some(completed_tick);
     }
 
-    /// Retains a creative action only after its movement carrier was admitted.
-    pub fn queue_creative_destroy(&mut self, action: Option<CreativeDestroyBlock>) {
-        if let Some(action) = action {
-            self.creative_destroy_actions.push(action);
-        }
-    }
-
     /// Reanchors tick tracking when session or position authority changes.
     /// Position changes interrupt active mining; session changes reset it entirely.
     pub fn synchronize(&mut self, identity: (SessionGeneration, PositionAuthorityGeneration)) {
@@ -596,7 +583,6 @@ impl SurvivalMiningRuntime {
             .filter(|previous| *previous != identity)
         {
             self.last_stepped_tick = None;
-            self.creative_destroy_actions.clear();
             if session == identity.0 {
                 self.machine.interrupt();
             } else {
