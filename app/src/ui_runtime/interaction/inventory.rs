@@ -403,43 +403,22 @@ pub(super) fn scroll_container(
             (!primary_released).then(|| (view.key.clone(), at));
         return true;
     }
-    if primary_pressed {
-        for view in frame.hits.iter().rev() {
-            if view.kind == json_ui::HitKind::Modal
-                && view.contains(point)
-                && !view.input.inline_modal
-            {
-                break;
-            }
-            if view.kind != json_ui::HitKind::ScrollView || !view.enabled {
-                continue;
-            }
+    if primary_pressed && let Some(target) = json_ui::hit_test(&frame.hits, point) {
+        for view in frame
+            .hits
+            .iter()
+            .rev()
+            .filter(|view| view.kind == json_ui::HitKind::ScrollView && view.enabled)
+        {
             let Some(metrics) = frame.report.scrolls.get(&view.key) else {
                 continue;
             };
-            let clip = view.clip;
-            if point[0] < clip.x
-                || point[0] >= clip.x + clip.w
-                || point[1] < clip.y
-                || point[1] >= clip.y + clip.h
-                || view
-                    .transform
-                    .is_some_and(|transform| transform.inverse().is_none())
-                || metrics.bar_visible == Some(false)
-            {
+            if metrics.bar_visible == Some(false) {
                 continue;
             }
-            let local = view.local(point);
-            let contains = |rect: Option<[f64; 4]>| {
-                rect.is_some_and(|rect| {
-                    local[0] >= rect[0]
-                        && local[0] < rect[0] + rect[2]
-                        && local[1] >= rect[1]
-                        && local[1] < rect[1] + rect[3]
-                })
-            };
-            let on_thumb = contains(metrics.thumb);
-            if !on_thumb && !contains(metrics.track) {
+            let on_thumb = metrics.thumb_key.as_deref() == Some(target.key.as_str());
+            let on_track = metrics.track_key.as_deref() == Some(target.key.as_str());
+            if !on_thumb && !on_track {
                 continue;
             }
             runtime.screen_state_mut().pointer.reset();
@@ -456,15 +435,16 @@ pub(super) fn scroll_container(
                     )
                 };
                 if draggable && !primary_released {
+                    let local = view.local(point);
                     let axis = usize::from(!metrics.horizontal);
                     runtime.screen_state_mut().container_scroll_drag =
                         Some((view.key.clone(), local[axis]));
                 }
             } else if metrics.track_button.is_some() {
-                runtime
-                    .screen_state_mut()
-                    .container_scroll
-                    .insert(view.key.clone(), metrics.offset_for_track(local));
+                runtime.screen_state_mut().container_scroll.insert(
+                    view.key.clone(),
+                    metrics.offset_for_track(view.local(point)),
+                );
             }
             return true;
         }

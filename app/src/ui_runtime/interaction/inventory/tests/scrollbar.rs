@@ -36,8 +36,21 @@ fn frame() -> ui_engine::frame::EngineFrame {
         modal_root: None,
         transform: None,
     };
+    let mut track = region.clone();
+    track.key = "scroll/track".into();
+    track.kind = json_ui::HitKind::ScrollTrack;
+    track.rect = json_ui::RectOut {
+        x: 95.0,
+        y: 0.0,
+        w: 5.0,
+        h: 100.0,
+    };
+    let mut thumb = track.clone();
+    thumb.key = "scroll/thumb".into();
+    thumb.kind = json_ui::HitKind::ScrollBox;
+    thumb.rect.h = 50.0;
     ui_engine::frame::EngineFrame {
-        hits: Arc::from([region]),
+        hits: Arc::from([region, track, thumb]),
         report: json_ui::LayoutReport {
             scrolls: [(
                 "scroll".to_owned(),
@@ -47,6 +60,8 @@ fn frame() -> ui_engine::frame::EngineFrame {
                     viewport_rect: Some([0.0, 0.0, 100.0, 100.0]),
                     track: Some([95.0, 0.0, 5.0, 100.0]),
                     thumb: Some([95.0, 0.0, 5.0, 50.0]),
+                    thumb_key: Some("scroll/thumb".into()),
+                    track_key: Some("scroll/track".into()),
                     box_drag: json_ui::Draggable::Vertical,
                     track_button: Some("track".into()),
                     ..Default::default()
@@ -211,7 +226,11 @@ fn hidden_disabled_and_clipped_scrollbars_do_not_capture_presses() {
         match case {
             0 => Arc::make_mut(&mut frame.hits)[0].enabled = false,
             1 => frame.report.scrolls.get_mut("scroll").unwrap().bar_visible = Some(false),
-            _ => Arc::make_mut(&mut frame.hits)[0].clip.w = 90.0,
+            _ => {
+                for region in Arc::make_mut(&mut frame.hits) {
+                    region.clip.w = 90.0;
+                }
+            }
         }
         let mut runtime = UiRuntime::new(1);
         assert!(!scroll_container(
@@ -251,4 +270,118 @@ fn releasing_a_moved_thumb_applies_its_final_position() {
         Some(&20.0)
     );
     assert!(runtime.screen_state().container_scroll_drag.is_none());
+}
+
+#[test]
+fn foreground_controls_and_disabled_thumbs_keep_their_pointer_ownership() {
+    for foreground in [false, true] {
+        let mut frame = frame();
+        if foreground {
+            let mut regions = frame.hits.to_vec();
+            let mut button = regions.last().unwrap().clone();
+            button.kind = json_ui::HitKind::Button;
+            button.key = "foreground".into();
+            regions.push(button);
+            frame.hits = regions.into();
+        } else {
+            Arc::make_mut(&mut frame.hits)[2].enabled = false;
+        }
+        let mut runtime = UiRuntime::new(1);
+        assert!(!scroll_container(
+            &mut runtime,
+            &frame,
+            [97.0, 25.0],
+            &[],
+            true,
+            false
+        ));
+        assert!(runtime.screen_state().container_scroll_drag.is_none());
+    }
+}
+
+#[test]
+fn a_release_before_a_new_press_keeps_the_new_scrollbar_drag_held() {
+    use bevy::input::mouse::MouseButtonInput;
+    let (mut app, entity) = ordered::personal_app(2);
+    let extra = serde_json::json!({"scroll": {
+        "type": "scroll_view", "size": [100,100],
+        "scroll_view_port": "viewport", "scroll_content": "content",
+        "scrollbar_track": "track", "scrollbar_box": "thumb",
+        "scroll_box_and_track_panel": "bars",
+        "controls": [
+            {"viewport": {"type": "panel", "size": [90,100],
+                "controls": [{"content": {"type": "panel", "size": [90,200]}}]}},
+            {"bars": {"type": "panel", "size": [10,100],
+                "anchor_from": "right_middle", "anchor_to": "right_middle",
+                "controls": [
+                    {"track": {"type": "scroll_track", "size": [10,100]}},
+                    {"thumb": {"type": "scrollbar_box", "size": [10,50],
+                        "anchor_from": "top_middle", "anchor_to": "top_middle",
+                        "draggable": "vertical"}}
+                ]}}
+        ]
+    }});
+    let presentation = presentation_with_controls(
+        app.world().resource::<client_state::PlayerRuntime>(),
+        &app.world().resource::<UiRuntimeResource>().0,
+        &[extra],
+    );
+    let metrics = presentation
+        .engine_container_frame()
+        .unwrap()
+        .report
+        .scrolls
+        .values()
+        .next()
+        .unwrap();
+    let thumb = metrics.thumb.unwrap();
+    let start = window_point(
+        &presentation,
+        [
+            (thumb[0] + thumb[2] * 0.5) as f32,
+            (thumb[1] + thumb[3] * 0.5) as f32,
+        ],
+    );
+    app.world_mut()
+        .insert_resource(UiPresentationResource(presentation));
+    app.world_mut()
+        .get_mut::<Window>(entity)
+        .unwrap()
+        .set_cursor_position(Some(start));
+    for state in [ButtonState::Released, ButtonState::Pressed] {
+        let mut buttons = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
+        match state {
+            ButtonState::Released => {
+                buttons.press(MouseButton::Left);
+                buttons.release(MouseButton::Left);
+            }
+            ButtonState::Pressed => buttons.press(MouseButton::Left),
+        }
+        app.world_mut().write_message(MouseButtonInput {
+            button: MouseButton::Left,
+            state,
+            window: entity,
+        });
+    }
+    app.update();
+    assert!(
+        app.world()
+            .resource::<UiRuntimeResource>()
+            .screen_state()
+            .container_scroll_drag
+            .is_some()
+    );
+    app.world_mut()
+        .get_mut::<Window>(entity)
+        .unwrap()
+        .set_cursor_position(Some(start + Vec2::new(0.0, 10.0)));
+    app.update();
+    assert!(
+        app.world()
+            .resource::<UiRuntimeResource>()
+            .screen_state()
+            .container_scroll
+            .values()
+            .any(|offset| *offset > 0.0)
+    );
 }

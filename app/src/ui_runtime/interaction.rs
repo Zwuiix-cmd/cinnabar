@@ -95,16 +95,14 @@ pub(crate) fn drive_inventory_ui_actions(
         })
         .unwrap_or_default();
     // Button state is reset below while the inventory owns the pointer, so a later
-    // physical release no longer surfaces as `just_released`; read raw releases too.
-    let (mut raw_primary_release, mut raw_secondary_release) = (false, false);
+    // physical release no longer surfaces as `just_released`; read raw edges too.
+    let (mut primary_edge, mut secondary_edge) = (None, None);
     if let Some(messages) = mouse_messages.as_deref() {
         for input in release_cursor.read(messages) {
-            if input.state == ButtonState::Released {
-                match input.button {
-                    MouseButton::Left => raw_primary_release = true,
-                    MouseButton::Right => raw_secondary_release = true,
-                    _ => {}
-                }
+            match input.button {
+                MouseButton::Left => primary_edge = Some(input.state),
+                MouseButton::Right => secondary_edge = Some(input.state),
+                _ => {}
             }
         }
     }
@@ -129,6 +127,14 @@ pub(crate) fn drive_inventory_ui_actions(
         }
         return;
     }
+    // ButtonInput retains both edge flags for a release followed by a press.
+    // The last raw edge decides whether that new inventory gesture remains held.
+    if primary_edge == Some(ButtonState::Pressed) {
+        mouse_buttons.clear_just_released(MouseButton::Left);
+    }
+    if secondary_edge == Some(ButtonState::Pressed) {
+        mouse_buttons.clear_just_released(MouseButton::Right);
+    }
     let now_millis = time.map_or(0, |time| {
         u64::try_from(time.elapsed().as_millis()).unwrap_or(u64::MAX)
     });
@@ -139,7 +145,10 @@ pub(crate) fn drive_inventory_ui_actions(
         &presentation,
         menu.as_deref(),
         &mut mouse_buttons,
-        (raw_primary_release, raw_secondary_release),
+        (
+            primary_edge == Some(ButtonState::Released),
+            secondary_edge == Some(ButtonState::Released),
+        ),
         (presses, shift, control),
         &notches,
         focus.as_deref_mut(),
