@@ -682,10 +682,7 @@ fn parse_definition(root: &Nbt) -> Option<Definition> {
     })
 }
 
-/// Reads the Bedrock `minecraft:sound` block component used by custom blocks.
-///
-/// Network definitions normally encode it as `{ "sound": "stone" }`; the scalar form is
-/// accepted as well because some server implementations serialize the component directly.
+/// Reads a nonempty material from a scalar or compound sound component.
 fn sound_component(components: Option<&Nbt>) -> Option<Arc<str>> {
     let component = components?.field("minecraft:sound")?;
     let sound = component

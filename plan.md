@@ -529,6 +529,10 @@ Qualify audio admission, spatial playback, music and lifecycle behavior on suppo
 platforms. Missing source music/ambience requires lawful local input or the documented
 fallback; do not bundle game assets to fill gaps.
 
+Block sound materials resolve from pack entries, then base server components, then a
+stone fallback. Per-permutation sound components and matched native fallback
+qualification remain incomplete.
+
 Complete clean-install, first-run asset preparation, update/install recovery, startup
 and crash diagnostics, packaging and platform acceptance. Required carriers must pass
 validation; retain only the explicitly permitted diagnostic/optional fallbacks.

@@ -193,6 +193,7 @@ fn bare(identifier: &str) -> &str {
     identifier.strip_prefix("minecraft:").unwrap_or(identifier)
 }
 
+/// Looks up an exact pack entry before trying the shared legacy block alias.
 fn explicit_material<'a>(
     materials: &'a HashMap<Box<str>, Box<str>>,
     identifier: &str,
@@ -203,6 +204,7 @@ fn explicit_material<'a>(
         .map(AsRef::as_ref)
 }
 
+/// Accepts a lowered material name or the sound property of a block definition.
 fn block_material(value: &Value) -> Option<&str> {
     value
         .as_str()
@@ -337,7 +339,7 @@ impl SoundEventTables {
         Some(explicit_material(&self.materials, block_identifier).unwrap_or(DEFAULT_BLOCK_MATERIAL))
     }
 
-    /// Resolves a block's material in resource-pack, network-component, then vanilla order.
+    /// Prefers an explicit pack material, then a nonempty component, then the default.
     pub fn material_of_with_component<'a>(
         &'a self,
         block_identifier: &str,

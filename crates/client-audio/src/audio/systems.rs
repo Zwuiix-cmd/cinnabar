@@ -12,16 +12,14 @@ use bevy::prelude::{Local, Message, MessageReader, NonSendMut, Res, ResMut, Time
 use sim::PaletteWorld;
 
 use super::{
-    ambient::{
-        ADDITIONS_INTERVAL, IntervalTimer, MOOD_INTERVAL, MusicScheduler, dimension_ambience,
-        music_key,
-    },
     echo::{EchoOrigin, EchoSubject},
-    engine::{AudioEngine, LoopSpec, SoundRequest},
+    engine::{AudioEngine, SoundRequest},
     local::{LocalCue, LocalMotion, MotionSample},
     route,
     settings::AudioSettings,
 };
+
+pub mod ambience;
 
 const PLAYER: &str = assets::facts::VanillaEntity::Player.identifier();
 const FEET_PROBE_BELOW: f64 = 0.2;
@@ -49,6 +47,18 @@ fn network_block_lookup<'a>(
 ) -> impl Fn(u32) -> Option<String> + 'a {
     let lookup = block_lookup(collisions, stream.network_id_mode());
     move |wire_id| lookup(stream.resolve_block_network_id(wire_id))
+}
+
+/// Resolves a packet block's sound component in the current session's ID space.
+fn network_block_material<'a>(
+    collisions: Option<&'a dyn PhysicsCollisionRegistries>,
+    stream: &chunk_pipeline::WorldStream,
+    wire_id: u32,
+) -> Option<&'a str> {
+    collisions?.block_sound_material(
+        stream.network_id_mode(),
+        stream.resolve_block_network_id(wire_id),
+    )
 }
 
 /// The primary block identifier at `block`, borrowed from the registries so per-frame and
@@ -209,7 +219,6 @@ pub fn ingest_audio_events(
         stream.form_dimension_epoch(),
         &mut engine,
     );
-    let mode = stream.network_id_mode();
     let lookup = network_block_lookup(collisions, stream);
     for event in messages.read() {
         let synchronized_actor_alive = event.actor_synchronization.is_some_and(|owner| {
@@ -241,9 +250,7 @@ pub fn ingest_audio_events(
                 state.record_sound(
                     level,
                     &lookup,
-                    collisions.and_then(|collisions| {
-                        collisions.block_sound_material(mode, level.data as u32)
-                    }),
+                    network_block_material(collisions, stream, level.data as u32),
                     &mut engine,
                 );
                 continue;
@@ -254,9 +261,7 @@ pub fn ingest_audio_events(
                         bank.tables(),
                         level,
                         &lookup,
-                        collisions.and_then(|collisions| {
-                            collisions.block_sound_material(mode, level.data as u32)
-                        }),
+                        network_block_material(collisions, stream, level.data as u32),
                     )
                 });
                 let admitted = request.is_none()
@@ -454,145 +459,6 @@ fn local_cue_position(cue: LocalCue, sample: MotionSample) -> [f32; 3] {
     })
 }
 
-pub struct AmbientState {
-    underwater: bool,
-    mood: IntervalTimer,
-    additions: IntervalTimer,
-    music: MusicScheduler,
-}
-
-impl Default for AmbientState {
-    fn default() -> Self {
-        Self {
-            underwater: false,
-            mood: IntervalTimer::new(MOOD_INTERVAL),
-            additions: IntervalTimer::new(ADDITIONS_INTERVAL),
-            music: MusicScheduler::default(),
-        }
-    }
-}
-
-/// Ambience definition prefix for the eye position: the biome's own set when the pack defines it.
-fn ambience_prefix(
-    stream: &chunk_pipeline::WorldStream,
-    dimension: i32,
-    eye: [f32; 3],
-    engine: &AudioEngine,
-) -> Option<String> {
-    let fallback = dimension_ambience(dimension)?;
-    let biome = stream.camera_biome_id(eye).and_then(|id| {
-        stream
-            .biome_definitions_snapshot()
-            .iter()
-            .find(|definition| u32::from(definition.biome_id.unwrap_or(u16::MAX)) == id)
-            .map(|definition| definition.name.to_string())
-    });
-    let own = biome
-        .map(|name| format!("ambient.{name}"))
-        .filter(|prefix| {
-            engine
-                .bank()
-                .is_some_and(|bank| bank.definition(&format!("{prefix}.loop")).is_some())
-        });
-    Some(own.unwrap_or_else(|| fallback.to_owned()))
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn drive_ambience(
-    time: Res<Time>,
-    world: crate::observations::WorldObservation<'_>,
-    collisions: Option<&dyn crate::observations::CollisionLookup>,
-    eye: bevy::prelude::Vec3,
-    player_runtime: Option<&player_state::PlayerState>,
-    credits_active: bool,
-    mut engine: ResMut<AudioEngine>,
-    mut state: Local<AmbientState>,
-) {
-    if !engine.has_bank() {
-        return;
-    }
-    let dt = time.delta_secs();
-    let stream = world.stream.as_ref();
-    let dimension = stream.map_or(0, |stream| stream.current_dimension());
-    let creative = player_runtime
-        .and_then(|player| player.facts.player_game_mode())
-        .is_some_and(|mode| matches!(mode, protocol::PlayerGameMode::Creative));
-
-    let underwater = match (stream, collisions) {
-        (Some(stream), Some(collisions)) => {
-            let mode = stream.network_id_mode();
-            let palette = PaletteWorld::new(
-                stream.collision_store(),
-                collisions.registry(mode),
-                stream.current_dimension(),
-                Default::default(),
-            );
-            let block = [
-                eye.x.floor() as i32,
-                eye.y.floor() as i32,
-                eye.z.floor() as i32,
-            ];
-            palette
-                .primary_runtime_id(block)
-                .ok()
-                .is_some_and(|id| is_water(collisions.registry(mode), id))
-        }
-        _ => false,
-    };
-    if underwater != state.underwater {
-        let name = if underwater {
-            "ambient.underwater.enter"
-        } else {
-            "ambient.underwater.exit"
-        };
-        engine.enqueue(SoundRequest::new(name));
-        state.underwater = underwater;
-    }
-    let loop_spec = |name: &str| {
-        Some(LoopSpec {
-            name: name.into(),
-            volume: 1.0,
-        })
-    };
-    engine.set_loop(
-        "underwater",
-        underwater
-            .then(|| loop_spec("ambient.underwater.loop"))
-            .flatten(),
-    );
-    let prefix: Option<String> = stream
-        .and_then(|stream| ambience_prefix(stream, dimension, [eye.x, eye.y, eye.z], &engine));
-    engine.set_loop(
-        "dimension",
-        prefix
-            .as_deref()
-            .and_then(|prefix| loop_spec(&format!("{prefix}.loop"))),
-    );
-
-    // Unloaded chunks read as unlit, so mood waits for the eye's chunk to be present.
-    let dark = stream.is_some_and(|stream| {
-        let at = [eye.x, eye.y, eye.z];
-        let (block, sky) = stream.light_level_at(at);
-        stream.camera_biome_id(at).is_some() && block == 0 && sky == 0
-    });
-    let unit = engine.unit();
-    if state.mood.tick(dark && !underwater, dt, unit) {
-        let name = prefix
-            .as_deref()
-            .map_or_else(|| "ambient.cave".to_owned(), |p| format!("{p}.mood"));
-        engine.enqueue(SoundRequest::new(name));
-    }
-    let unit = engine.unit();
-    if let Some(prefix) = prefix.as_deref()
-        && state.additions.tick(true, dt, unit)
-    {
-        engine.enqueue(SoundRequest::new(format!("{prefix}.additions")));
-    }
-
-    let key = music_key(stream.is_some(), dimension, creative, credits_active);
-    super::music::drive_music(&mut engine, &mut state.music, key, dt);
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn drive_weather_and_particles(
     time: Res<Time>,
@@ -732,6 +598,14 @@ mod tests {
                 _ => None,
             }
         }
+
+        fn block_sound_material(&self, _: assets::NetworkIdMode, runtime_id: u32) -> Option<&str> {
+            match runtime_id {
+                1 => Some("metal"),
+                7 | 0x8000_0007 => Some("wood"),
+                _ => None,
+            }
+        }
     }
 
     #[test]
@@ -769,6 +643,13 @@ mod tests {
             &serde_json::json!({"stone": "stone", "dirt": "gravel"}),
         );
         let collisions = BlockMaterials::default();
+        let component_tables = assets::SoundEventTables::from_json(
+            &serde_json::json!({"block_sounds": {
+                "wood": {"events": {"break": "dig.wood"}},
+                "metal": {"events": {"break": "dig.metal"}}
+            }}),
+            &serde_json::json!({}),
+        );
         for (hashes, wire) in [(false, 1), (true, 0x8000_0007_u32)] {
             let mut stream = chunk_pipeline::WorldStream::new(protocol::WorldBootstrap {
                 local_player_unique_id: 1,
@@ -799,6 +680,14 @@ mod tests {
                 block_lookup(Some(&collisions), assets::NetworkIdMode::Sequential)(7),
                 Some("minecraft:stone".to_owned()),
             );
+            let request = route::level_sound_request_with_component_material(
+                &component_tables,
+                &event,
+                &lookup,
+                network_block_material(Some(&collisions), &stream, wire),
+            )
+            .unwrap();
+            assert_eq!(request.name.as_ref(), "dig.wood");
         }
     }
 
