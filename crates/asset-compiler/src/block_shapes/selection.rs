@@ -58,11 +58,6 @@ pub(super) fn shape(record: &RegistryRecord, shapes: ShapeTraits) -> Option<Shap
     if shapes.intersects(ShapeTraits::VISUAL_UNIT | ShapeTraits::END_GATEWAY) {
         return Some(bounds([0.0; 3], [1.0; 3]));
     }
-    if assets::facts::block_render_fact(&record.name).kind
-        == assets::facts::BlockRenderKind::LightningRod
-    {
-        return lightning_rod_shape(record);
-    }
     if record.traits.contains(BlockTraits::STANDING_SIGN) {
         return Some(bounds([0.25, 0.0, 0.25], [0.75, 1.0, 0.75]));
     }
@@ -102,6 +97,12 @@ pub(super) fn shape(record: &RegistryRecord, shapes: ShapeTraits) -> Option<Shap
     }
     if record.traits.contains(BlockTraits::TORCH) {
         return torch_shape(record);
+    }
+    if matches!(
+        assets::facts::block_render_fact(&record.name).kind,
+        assets::facts::BlockRenderKind::EndRod | assets::facts::BlockRenderKind::LightningRod
+    ) {
+        return rod_shape(record);
     }
     let (inset, height, edge): (f32, f32, f32) = match () {
         _ if shapes.contains(ShapeTraits::GRASS) => (0.1, 0.8, 0.9),
@@ -181,8 +182,8 @@ fn torch_shape(record: &RegistryRecord) -> Option<ShapeBox> {
     Some(bounds(min, max))
 }
 
-/// Lightning rods keep a six-pixel stem on both axes perpendicular to facing.
-fn lightning_rod_shape(record: &RegistryRecord) -> Option<ShapeBox> {
+/// End and lightning rods use a four-pixel square and fill the block along their facing axis.
+fn rod_shape(record: &RegistryRecord) -> Option<ShapeBox> {
     let facing = super::state::State::read(record)?.number(BlockProperty::FacingDirection)?;
     let axis = match facing {
         0 | 1 => 1,
@@ -190,8 +191,8 @@ fn lightning_rod_shape(record: &RegistryRecord) -> Option<ShapeBox> {
         4 | 5 => 0,
         _ => return None,
     };
-    let mut min = [0.3125; 3];
-    let mut max = [0.6875; 3];
+    let mut min = [0.375; 3];
+    let mut max = [0.625; 3];
     min[axis] = 0.0;
     max[axis] = 1.0;
     Some(bounds(min, max))
