@@ -427,7 +427,7 @@ pub(super) fn scroll_container(
             if on_track
                 && (metrics.track_button.is_none() || target.pressed != metrics.track_button)
             {
-                return false;
+                break;
             }
             runtime.screen_state_mut().pointer.reset();
             if on_thumb {

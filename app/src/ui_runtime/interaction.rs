@@ -82,9 +82,11 @@ pub(crate) fn drive_inventory_ui_actions(
     mut runtime: ResMut<UiRuntimeResource>,
     mut focus: Option<ResMut<client_state::CursorFocus>>,
     driven: Option<Res<client_state::DrivenInput>>,
+    consent: Option<Res<client_state::ConsentInput>>,
 ) {
-    let input_available = driven.is_some()
-        || (window.focused && focus.as_ref().is_none_or(|focus| focus.available()));
+    let input_available = !consent.is_some_and(|consent| consent.0)
+        && (driven.is_some()
+            || (window.focused && focus.as_ref().is_none_or(|focus| focus.available())));
     let notches: Vec<(f32, MouseScrollUnit)> = wheel_messages
         .as_deref()
         .map(|messages| {

@@ -300,9 +300,8 @@ fn foreground_controls_and_disabled_thumbs_keep_their_pointer_ownership() {
     }
 }
 
-#[test]
-fn a_release_before_a_new_press_keeps_the_new_scrollbar_drag_held() {
-    use bevy::input::mouse::MouseButtonInput;
+/// Builds a live scrollbar fixture and establishes its inventory window state.
+fn scrollbar_app() -> (App, Entity, Vec2) {
     let (mut app, entity) = ordered::personal_app(2);
     let extra = serde_json::json!({"scroll": {
         "type": "scroll_view", "size": [100,100],
@@ -349,6 +348,14 @@ fn a_release_before_a_new_press_keeps_the_new_scrollbar_drag_held() {
         .get_mut::<Window>(entity)
         .unwrap()
         .set_cursor_position(Some(start));
+    app.update();
+    (app, entity, start)
+}
+
+#[test]
+fn a_release_before_a_new_press_keeps_the_new_scrollbar_drag_held() {
+    use bevy::input::mouse::MouseButtonInput;
+    let (mut app, entity, start) = scrollbar_app();
     for state in [ButtonState::Released, ButtonState::Pressed] {
         let mut buttons = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
         match state {
@@ -420,4 +427,64 @@ fn track_presses_follow_the_configured_button_mapping() {
             mapping == Some("track")
         );
     }
+}
+
+#[test]
+fn consent_input_cancels_scrollbar_capture_before_ordinary_input_resumes() {
+    let (mut app, _, _) = scrollbar_app();
+    let key = app
+        .world()
+        .resource::<UiPresentationResource>()
+        .engine_container_frame()
+        .unwrap()
+        .report
+        .scrolls
+        .keys()
+        .next()
+        .unwrap()
+        .clone();
+    app.world_mut()
+        .resource_mut::<UiRuntimeResource>()
+        .screen_state_mut()
+        .container_scroll_drag = Some((key, 25.0));
+    app.world_mut()
+        .insert_resource(client_state::ConsentInput(true));
+    app.update();
+    assert!(
+        app.world()
+            .resource::<UiRuntimeResource>()
+            .screen_state()
+            .container_scroll_drag
+            .is_none()
+    );
+    app.world_mut()
+        .resource_mut::<client_state::ConsentInput>()
+        .0 = false;
+    app.update();
+    assert!(
+        app.world()
+            .resource::<UiRuntimeResource>()
+            .screen_state()
+            .container_scroll
+            .is_empty()
+    );
+}
+
+#[test]
+fn a_declined_track_press_still_handles_wheel_input() {
+    let mut frame = frame();
+    Arc::make_mut(&mut frame.hits)[1].pressed = None;
+    let mut runtime = UiRuntime::new(1);
+    assert!(!scroll_container(
+        &mut runtime,
+        &frame,
+        [97.0, 75.0],
+        &[(-20.0, MouseScrollUnit::Pixel)],
+        true,
+        false
+    ));
+    assert_eq!(
+        runtime.screen_state().container_scroll.get("scroll"),
+        Some(&20.0)
+    );
 }
