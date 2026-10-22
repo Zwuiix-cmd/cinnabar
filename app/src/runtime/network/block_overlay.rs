@@ -477,11 +477,8 @@ impl Builder<'_> {
         if shown.is_empty() {
             return invisible_visual();
         }
-        let identifier = components.geometry.as_deref().unwrap_or_default();
         for cube in shown {
-            for (mut face_quad, instance) in
-                pack_compiler::block_geometry::carried_item_cube(identifier, cube).quads()
-            {
+            for (mut face_quad, instance) in cube.quads() {
                 if components.geometry.as_deref() == Some(FULL_BLOCK_V1)
                     && face_quad.face == assets::BlockFace::Down as usize
                 {

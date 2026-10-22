@@ -244,49 +244,28 @@ fn catalog_paths_with_an_image_extension_resolve() {
     assert_eq!(icons.icons.len(), 2);
 }
 
-// A block's item icon takes precedence over both its thumbnail and its native GUI mesh.
+// A custom block item draws as its block even when a short-name guess would resolve.
 #[test]
-fn item_icons_override_block_geometry_and_clear_block_only_state() {
+fn block_items_beat_short_name_guesses() {
     let key = |identifier: &str, key: &str| (Arc::<str>::from(identifier), Arc::<str>::from(key));
-    let block = |identifier: &str| SessionIcon {
-        identifier: identifier.into(),
+    let block = SessionIcon {
+        identifier: "t:crate".into(),
         metadata: 0,
         width: 32,
         height: 32,
         rgba8: vec![7; 32 * 32 * 4].into(),
     };
     let blocks = BlockIcons {
-        icons: vec![block("t:gem"), block("t:crate")],
-        block_sheets: vec![SessionIcon {
-            identifier: "t:crate".into(),
-            metadata: 0,
-            width: u32::from(assets::BLOCK_ITEM_SHEET_SIZE[0]),
-            height: u32::from(assets::BLOCK_ITEM_SHEET_SIZE[1]),
-            rgba8: vec![
-                255;
-                usize::from(assets::BLOCK_ITEM_SHEET_SIZE[0])
-                    * usize::from(assets::BLOCK_ITEM_SHEET_SIZE[1])
-                    * 4
-            ]
-            .into(),
-        }],
-        block_models: [(
-            "t:crate".into(),
-            render_model::textured_cube_vertices(render_model::equipment::blocks::face_rects([
-                0.0, 0.0, 1.0, 1.0,
-            ]))
-            .into(),
-        )]
-        .into(),
-        block_material_flags: [("t:crate".into(), assets::MATERIAL_FLAG_ALPHA_CUTOUT)].into(),
+        icons: vec![block],
         misses: vec![("t:broken".into(), "no drawable visual".into())],
+        ..Default::default()
     };
     let icons = compile_session_icons(
         &view(),
         &[
             key("t:crate", "test:gem"),
             key("t:broken", "test:gem"),
-            key("t:gem", "gem"),
+            key("t:gem", "test:gem"),
         ],
         blocks,
     )
@@ -296,44 +275,9 @@ fn item_icons_override_block_geometry_and_clear_block_only_state() {
         .iter()
         .find(|icon| icon.identifier.as_ref() == "t:crate")
         .expect("block icon");
-    assert_eq!((crate_icon.width, crate_icon.rgba8[0]), (16, 0));
-    assert!(icons.icons.iter().all(|icon| icon.width == 16));
-    assert_eq!(
-        icons.icons.len(),
-        3,
-        "an item icon also replaces a missing block visual"
-    );
-    assert!(icons.misses.is_empty());
-    assert!(
-        icons.block_sheets.is_empty(),
-        "the sprite must not be replaced by a GUI block mesh"
-    );
-    assert!(
-        icons.block_models.is_empty(),
-        "held items must also use the item sprite"
-    );
-    assert!(icons.block_material_flags.is_empty());
-}
-
-#[test]
-fn missing_item_art_keeps_the_block_fallback() {
-    let icons = compile_session_icons(
-        &view(),
-        &[("t:crate".into(), "missing_key".into())],
-        BlockIcons {
-            icons: vec![SessionIcon {
-                identifier: "t:crate".into(),
-                metadata: 0,
-                width: 32,
-                height: 32,
-                rgba8: vec![7; 32 * 32 * 4].into(),
-            }],
-            ..Default::default()
-        },
-    )
-    .expect("block fallback");
-    assert_eq!(icons.icons.len(), 1);
-    assert_eq!((icons.icons[0].width, icons.icons[0].rgba8[0]), (32, 7));
+    assert_eq!((crate_icon.width, crate_icon.rgba8[0]), (32, 7));
+    assert_eq!(icons.icons.len(), 2, "t:broken keeps no sprite");
+    assert!(icons.misses["t:broken"].contains("no drawable visual"));
 }
 
 #[test]

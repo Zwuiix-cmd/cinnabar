@@ -719,42 +719,21 @@ pub(crate) fn compiled_connected_bases(
             flag,
             MODEL_TEMPLATE_FLAG_FENCE_WOOD | MODEL_TEMPLATE_FLAG_FENCE_NETHER
         ) {
-            let compound = match templates.get(index + 16) {
-                Some(head) if head.flags == MODEL_TEMPLATE_FLAG_COMPOUND_NEXT => {
-                    let Some(tail) = templates.get(index + 17) else {
-                        return Err(invalid("fence template group is truncated"));
-                    };
-                    if tail.flags != 0 {
-                        return Err(invalid("fence template group is noncanonical"));
-                    }
-                    true
-                }
-                _ => false,
-            };
-            let group_len = if compound { 18 } else { 17 };
-            let Some(group) = templates.get(index..index + group_len) else {
+            let Some(group) = templates.get(index..index + 17) else {
                 return Err(invalid("fence template group is truncated"));
             };
-            let valid = group[0].flags == flag
-                && group[0].quad_count == 6
-                && (0..15).all(|mask| {
-                    let template = group[mask + 1];
-                    template.flags == flag
-                        && template.quad_count == mask.count_ones() * if compound { 10 } else { 8 }
-                })
-                && if compound {
-                    group[16].flags == MODEL_TEMPLATE_FLAG_COMPOUND_NEXT
-                        && group[16].quad_count == 32
-                        && group[17].flags == 0
-                        && group[17].quad_count == 8
+            if group.iter().enumerate().any(|(offset, template)| {
+                let expected = if offset == 0 {
+                    6
                 } else {
-                    group[16].flags == flag && group[16].quad_count == 15 * 8
+                    ((offset - 1) as u32).count_ones() * 8
                 };
-            if !valid {
+                template.flags != flag || template.quad_count != expected
+            }) {
                 return Err(invalid("fence template group is noncanonical"));
             }
             bases.push((index, flag));
-            index += group_len;
+            index += 17;
         } else if flag == MODEL_TEMPLATE_FLAG_BUBBLE_COLUMN {
             let Some(group) =
                 templates.get(index..index + crate::BUBBLE_COLUMN_TEMPLATE_COUNT as usize)

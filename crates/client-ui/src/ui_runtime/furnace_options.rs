@@ -92,7 +92,6 @@ impl UiRuntime {
         player.inventory.set_furnace_options(kind, options);
         self.screen.furnace = Some(options);
         self.screen.container_scroll.clear();
-        self.screen.container_scroll_drag = None;
         Ok(0)
     }
 }

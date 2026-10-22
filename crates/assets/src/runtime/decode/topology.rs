@@ -40,42 +40,21 @@ pub(super) fn runtime_connected_bases(bytes: &[u8]) -> Result<Vec<(usize, u32)>,
             flag,
             MODEL_TEMPLATE_FLAG_FENCE_WOOD | MODEL_TEMPLATE_FLAG_FENCE_NETHER
         ) {
-            let compound = match records.get(index + 16) {
-                Some(head) if u32_at(head, 8) == MODEL_TEMPLATE_FLAG_COMPOUND_NEXT => {
-                    let Some(tail) = records.get(index + 17) else {
-                        return Err(invalid("fence template group is truncated"));
-                    };
-                    if u32_at(tail, 8) != 0 {
-                        return Err(invalid("fence template group is noncanonical"));
-                    }
-                    true
-                }
-                _ => false,
-            };
-            let group_len = if compound { 18 } else { 17 };
-            let Some(group) = records.get(index..index + group_len) else {
+            let Some(group) = records.get(index..index + 17) else {
                 return Err(invalid("fence template group is truncated"));
             };
-            let valid = u32_at(group[0], 8) == flag
-                && u32_at(group[0], 4) == 6
-                && (0..15).all(|mask| {
-                    let record = group[mask + 1];
-                    u32_at(record, 8) == flag
-                        && u32_at(record, 4) == mask.count_ones() * if compound { 10 } else { 8 }
-                })
-                && if compound {
-                    u32_at(group[16], 8) == MODEL_TEMPLATE_FLAG_COMPOUND_NEXT
-                        && u32_at(group[16], 4) == 32
-                        && u32_at(group[17], 8) == 0
-                        && u32_at(group[17], 4) == 8
+            if group.iter().enumerate().any(|(offset, record)| {
+                let expected = if offset == 0 {
+                    6
                 } else {
-                    u32_at(group[16], 8) == flag && u32_at(group[16], 4) == 15 * 8
+                    ((offset - 1) as u32).count_ones() * 8
                 };
-            if !valid {
+                u32_at(record, 8) != flag || u32_at(record, 4) != expected
+            }) {
                 return Err(invalid("fence template group is noncanonical"));
             }
             bases.push((index, flag));
-            index += group_len;
+            index += 17;
         } else if flag == MODEL_TEMPLATE_FLAG_BUBBLE_COLUMN {
             let Some(group) =
                 records.get(index..index + crate::BUBBLE_COLUMN_TEMPLATE_COUNT as usize)

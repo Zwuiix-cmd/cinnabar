@@ -694,7 +694,7 @@ fn custom_content_preview_uses_authored_mesh_and_matching_sheet() {
             .all(|placement| matches!(placement, player_preview::PreviewHeldPlacement::Block))
     );
     assert!(
-        !presentation.session_icons.models.is_empty(),
-        "shaped custom block items use their authored carried geometry in the creative inventory"
+        presentation.session_icons.models.is_empty(),
+        "shaped items keep their authored thumbnail instead of drawing as cubes"
     );
 }

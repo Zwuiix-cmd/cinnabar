@@ -4,7 +4,7 @@ use super::context::{
     ModelStorage, RuleInputs, diagnostic_visual, push_model_template, set_model_visual,
 };
 use super::dispatcher::CompileRuleResult;
-use crate::block_geometry::{BlockGeometryCatalog, carried_item_cube};
+use crate::block_geometry::BlockGeometryCatalog;
 use assets::facts::{BlockRenderKind, block_render_fact};
 
 /// Compiles admitted pack geometry with its authored face UVs and quarter-turn transform.
@@ -40,7 +40,7 @@ pub(in crate::compiler) fn compile_rule(
         }
         let mut quads = Vec::new();
         for cube in &geometry.cubes {
-            for (face, instance) in carried_item_cube(model.identifier.as_ref(), cube).quads() {
+            for (face, instance) in cube.quads() {
                 if instance.is_some_and(|instance| instance != model.material_instance.as_ref()) {
                     return Ok(CompileRuleResult::Reject);
                 }
@@ -97,38 +97,4 @@ pub(in crate::compiler) fn compile_rule(
     let mut visual = diagnostic_visual(record);
     set_model_visual(&mut visual, [material; 6], template);
     Ok(CompileRuleResult::Compiled(visual))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::block_geometry::{Cube, FaceUv};
-
-    fn gate_post() -> Cube {
-        Cube {
-            bone: "bone".into(),
-            min: [0.0, 5.0, 7.0],
-            max: [2.0, 16.0, 9.0],
-            faces: std::array::from_fn(|_| {
-                Some(FaceUv {
-                    uv: [0.0, 0.0],
-                    size: [2.0, 2.0],
-                    material_instance: None,
-                })
-            }),
-            rotations: vec![
-                ([3.0, 10.5, 7.0], [0.0, -90.0, 0.0]),
-                ([8.0, 0.0, 8.0], [0.0, -90.0, 0.0]),
-            ],
-        }
-    }
-
-    #[test]
-    fn carried_gate_item_drops_only_the_display_root_turn() {
-        let cube = gate_post();
-        let carried = carried_item_cube("geometry.fence_gate_carried", &cube);
-        assert_eq!(carried.rotations.len(), 1);
-        let ordinary = carried_item_cube("geometry.fence_gate", &cube);
-        assert_eq!(ordinary.rotations.len(), 2);
-    }
 }
