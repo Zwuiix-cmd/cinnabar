@@ -167,18 +167,49 @@ fn fishing_line_anchors_for(
         .collect()
 }
 
-fn camera_space_point_to_world(point: [f32; 3], camera: &Transform) -> Option<[f32; 3]> {
-    let world = camera.to_matrix().transform_point3(Vec3::from_array(point));
-    world.is_finite().then_some(world.to_array())
+/// Reprojects a point from the hand pass into the world camera's view so a world-space rope keeps
+/// the same screen position as the camera-local held item. The hand and world passes deliberately
+/// use different FOVs, and directly applying the camera transform would therefore leave a gap.
+fn hand_point_to_world_view(
+    point: [f32; 3],
+    world_projection: &Projection,
+    aspect: f32,
+    hand_fov: f32,
+) -> Option<Vec3> {
+    if !aspect.is_finite() || aspect <= 0.0 || !hand_fov.is_finite() || hand_fov <= 0.0 {
+        return None;
+    }
+    let hand_projection = glam::camera::rh::proj::directx::perspective_infinite_reverse(
+        hand_fov,
+        aspect,
+        render_api::CAMERA_NEAR_PLANE_BLOCKS,
+    );
+    let hand_clip = hand_projection * Vec3::from_array(point).extend(1.0);
+    if !hand_clip.is_finite() || hand_clip.w <= 0.0 {
+        return None;
+    }
+    let hand_ndc = hand_clip / hand_clip.w;
+    let world_clip = world_projection.get_clip_from_view();
+    if !world_clip.is_finite() {
+        return None;
+    }
+    let world_view = world_clip.inverse() * hand_ndc;
+    if !world_view.is_finite() || world_view.w.abs() < f32::EPSILON {
+        return None;
+    }
+    Some(world_view.truncate() / world_view.w)
 }
 
 /// Uses the rendered first-person item rather than the hidden third-person body when the local
-/// player casts a fishing line in first person. The item submission is in camera space, so its
-/// sampled rod tip is mapped back through the same camera transform used by the world pass.
+/// player casts a fishing line in first person. The item submission is in hand-pass camera space;
+/// reproject its sampled rod tip through the world pass before placing the rope.
 fn first_person_fishing_line_anchor_for(
     source: &HandSource,
     partial_tick: f32,
     camera: &Transform,
+    projection: &Projection,
+    aspect: f32,
+    hand_fov: f32,
 ) -> Option<FishingLineAnchor> {
     let submissions = source.submissions();
     let submission = submissions.get(1)?.as_ref()?;
@@ -186,9 +217,11 @@ fn first_person_fishing_line_anchor_for(
         return None;
     }
     let from = fishing_line_anchor_for_submission(submission, partial_tick)?;
+    let from = hand_point_to_world_view(from, projection, aspect, hand_fov)?;
+    let from = camera.to_matrix().transform_point3(from);
     Some(FishingLineAnchor {
         runtime_id: submission.input.identity.runtime_id,
-        from: camera_space_point_to_world(from, camera)?,
+        from: from.is_finite().then_some(from.to_array())?,
     })
 }
 
@@ -461,13 +494,23 @@ pub fn prepare_actor_render_frame(
             &mut batch,
         );
     }
+    let first_person_fishing_line_anchor = (!input.hide_hand)
+        .then(|| params.presentation.camera.single().ok())
+        .flatten()
+        .and_then(|(camera, projection)| {
+            hand_source.as_ref().and_then(|source| {
+                first_person_fishing_line_anchor_for(
+                    source,
+                    step.partial_tick,
+                    camera,
+                    projection,
+                    state.captured_aspect,
+                    hand_camera_fov?,
+                )
+            })
+        });
     let mut fishing_line_anchors = fishing_line_anchors_for(&batch, step.partial_tick);
-    if !input.hide_hand
-        && let Ok((camera, _)) = params.presentation.camera.single()
-        && let Some(anchor) = hand_source.as_ref().and_then(|source| {
-            first_person_fishing_line_anchor_for(source, step.partial_tick, camera)
-        })
-    {
+    if let Some(anchor) = first_person_fishing_line_anchor {
         fishing_line_anchors.retain(|known| known.runtime_id != anchor.runtime_id);
         fishing_line_anchors.push(anchor);
     }
@@ -565,6 +608,8 @@ mod billboard_frame_tests;
 mod fishing_line_anchor_tests {
     use std::sync::Arc;
 
+    use bevy::prelude::PerspectiveProjection;
+
     use super::*;
 
     #[test]
@@ -623,12 +668,29 @@ mod fishing_line_anchor_tests {
     }
 
     #[test]
-    fn first_person_anchor_returns_to_world_through_the_render_camera() {
+    fn first_person_anchor_reprojection_preserves_the_hand_screen_position() {
         let camera = Transform::from_xyz(10.0, 20.0, 30.0);
+        let aspect = 16.0 / 9.0;
+        let hand_fov = HAND_FOV_DEGREES.to_radians();
+        let point = [0.4, -0.2, -0.9];
+        let projection = Projection::Perspective(PerspectiveProjection {
+            fov: 100.0_f32.to_radians(),
+            aspect_ratio: aspect,
+            ..Default::default()
+        });
+        let view = hand_point_to_world_view(point, &projection, aspect, hand_fov).unwrap();
+        let world = camera.to_matrix().transform_point3(view);
+        assert!(world.is_finite());
 
-        assert_eq!(
-            camera_space_point_to_world([1.0, 2.0, 3.0], &camera),
-            Some([11.0, 22.0, 33.0])
+        let hand_projection = glam::camera::rh::proj::directx::perspective_infinite_reverse(
+            hand_fov,
+            aspect,
+            render_api::CAMERA_NEAR_PLANE_BLOCKS,
         );
+        let hand_ndc = (hand_projection * Vec3::from_array(point).extend(1.0)).truncate();
+        let hand_w = (hand_projection * Vec3::from_array(point).extend(1.0)).w;
+        let world_clip = projection.get_clip_from_view() * view.extend(1.0);
+        assert!((world_clip.x / world_clip.w - hand_ndc.x / hand_w).abs() < 1e-5);
+        assert!((world_clip.y / world_clip.w - hand_ndc.y / hand_w).abs() < 1e-5);
     }
 }
