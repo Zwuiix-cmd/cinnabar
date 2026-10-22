@@ -204,7 +204,7 @@ fn withdrawing_the_pointer_cancels_scrollbar_capture() {
     let mut player = client_state::PlayerRuntime(player_state::PlayerState::new(1));
     let mut runtime = client_ui::test_support::inventory_session(&mut player);
     runtime.toggle_inventory(&mut player, None);
-    runtime.observe_inventory_window(&mut player);
+    runtime.observe_inventory_window(&player);
     let presentation = presentation(&player, &runtime);
     runtime.screen_state_mut().container_scroll_drag = Some(("scroll".into(), 25.0));
     let mut window = window(Vec2::ZERO);
