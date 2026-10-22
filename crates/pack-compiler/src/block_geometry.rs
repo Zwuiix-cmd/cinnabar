@@ -4,7 +4,7 @@
 //! face names are world directions. Faces map `u` to the viewer's right and
 //! `v` downward, with up textures top-north and down textures top-south.
 
-use std::{borrow::Cow, collections::HashMap};
+use std::collections::HashMap;
 
 use serde_json::Value;
 
@@ -36,26 +36,6 @@ pub struct Cube {
     /// Rotations to apply in order (cube, then each ancestor bone), in block-local pixels:
     /// a pivot and X/Y/Z angles in the world frame's authored convention.
     pub rotations: Vec<([f32; 3], [f32; 3])>,
-}
-
-/// Removes the display-only root turn from Nexly-style carried fence gates.
-///
-/// The carried model keeps cube-local rotations for the closed slats, but its root bone is
-/// turned ninety degrees for another Bedrock display context. Inventory block models already
-/// use the canonical carried orientation, so only that final root rotation is discarded.
-pub fn carried_item_cube<'a>(identifier: &str, cube: &'a Cube) -> Cow<'a, Cube> {
-    let Some((pivot, angles)) = cube.rotations.last() else {
-        return Cow::Borrowed(cube);
-    };
-    let is_carried_gate = identifier.ends_with("fence_gate_carried");
-    let is_display_root = *pivot == [8.0, 0.0, 8.0] && *angles == [0.0, -90.0, 0.0];
-    if is_carried_gate && is_display_root {
-        let mut cube = cube.clone();
-        cube.rotations.pop();
-        Cow::Owned(cube)
-    } else {
-        Cow::Borrowed(cube)
-    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -126,9 +106,12 @@ fn world_pivot(pivot: [f32; 3]) -> [f32; 3] {
     [8.0 - pivot[0], pivot[1], pivot[2] + 8.0]
 }
 
-/// Authored X/Y/Z rotation as the angles applied in the mirrored world frame, X then Y then Z.
+/// Authored X/Y/Z rotation as the angles applied in the X-mirrored block frame, X then Y then Z.
+///
+/// In the authored frame Bedrock turns X and Z opposite to a right-handed rotation (the
+/// entity rig's convention). Mirroring X reverses the Y and Z turns, so here only X is negated.
 fn world_angles(rotation: [f32; 3]) -> [f32; 3] {
-    [-rotation[0], -rotation[1], -rotation[2]]
+    [-rotation[0], -rotation[1], rotation[2]]
 }
 
 /// Projects resolved bone cubes into the block coordinate frame.

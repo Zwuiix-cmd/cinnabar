@@ -431,12 +431,7 @@ fn block_cubes(icons: &SessionIcons, packed: &PackedIcons) -> BTreeMap<IconKey, 
         ) else {
             continue;
         };
-        if let Some(vertices) = icons.block_models.get(&sheet.identifier) {
-            if [sheet.width as u16, sheet.height as u16] == assets::BLOCK_ITEM_SHEET_SIZE
-                && let Some(mesh) = item_gui::block_actor_model(vertices, *placed)
-            {
-                models.insert(icon_key(*thumbnail), mesh);
-            }
+        if icons.block_models.contains_key(&sheet.identifier) {
             continue;
         }
         if icons

@@ -980,9 +980,7 @@ fn custom_components_declare_a_player_interact_handler() {
             ("target", text("self")),
         ]),
     )])));
-    assert!(!parsed(root(vec![
-        ("minecraft:on_interact", Nbt::Byte(1),)
-    ])));
+    assert!(!parsed(root(vec![("minecraft:on_interact", Nbt::Byte(1))])));
 }
 
 // Packs alias faces to shared instances; dropping the alias would draw the `*` texture there.

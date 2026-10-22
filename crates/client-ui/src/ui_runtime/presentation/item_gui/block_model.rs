@@ -65,52 +65,6 @@ pub(in crate::ui_runtime::presentation) fn mesh(
         .map(Arc::new)
 }
 
-/// Draws a carried custom block model from its full material sheet.
-///
-/// Custom block items already arrive as six-vertex textured quads in centred block
-/// coordinates. Keeping that geometry here makes their creative-inventory rendering use the
-/// same projection, depth test and alpha cutoff as vanilla shaped block items.
-pub(in crate::ui_runtime::presentation) fn actor_model(
-    source: &[render_model::ActorRigVertex],
-    texture: IconRef,
-) -> Option<Arc<UiMesh>> {
-    if source.is_empty() || !source.len().is_multiple_of(6) {
-        return None;
-    }
-    let mut vertices = Vec::with_capacity(source.len());
-    let mut indices = Vec::with_capacity(source.len());
-    for quad in source.chunks_exact(6) {
-        let corners = [quad[0], quad[1], quad[2], quad[5]];
-        let shade = (face_brightness(
-            corners.map(|vertex| vertex.position.map(|coordinate| coordinate + 0.5)),
-        ) * f32::from(u8::MAX)) as u8;
-        let start = vertices.len() as u32;
-        for vertex in quad {
-            let [x, y, z] = project_cube(vertex.position.map(|coordinate| coordinate + 0.5));
-            let mut projected = super::vertex(
-                [x / GUI_ITEM_SIDE, y / GUI_ITEM_SIDE],
-                super::atlas_uv(texture, vertex.uv)?,
-                [shade, shade, shade, 255],
-                texture.glint,
-                true,
-            );
-            projected.clip_z = depth(z);
-            vertices.push(projected);
-        }
-        indices.extend([0, 1, 2, 3, 4, 5].map(|index| start + index));
-    }
-    let mut batch = super::batch(
-        texture.page,
-        0..u32::try_from(indices.len()).ok()?,
-        Some(ALPHA_CUTOFF),
-    );
-    batch.depth_test = true;
-    batch.depth_write = true;
-    UiMesh::new(vertices.into(), indices.into(), vec![batch].into())
-        .ok()
-        .map(Arc::new)
-}
-
 /// The projection's view depth (smaller is nearer) as UI depth, where greater is nearer.
 fn depth(z: f32) -> f32 {
     0.5 - z / 8.0
