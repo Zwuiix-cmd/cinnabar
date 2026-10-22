@@ -118,6 +118,47 @@ pub struct ActorPresentationStyle {
 #[derive(Resource, Default)]
 pub struct ActorFramePartialTick(pub f32);
 
+/// The world-space point where a rendered fishing rod releases its line.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct FishingLineAnchor {
+    pub(crate) runtime_id: u64,
+    pub(crate) from: [f32; 3],
+}
+
+/// The vanilla fishing-rod sprite's tip is the opaque pixel at `(14, 1)` in its 16x16 icon.
+/// `held_sprite_vertices` maps that icon into the held-item frame, whose X axis is mirrored.
+const FISHING_ROD_TIP: [f32; 3] = [-0.90625, 0.90625, 0.0];
+
+/// Samples the same root bone used by the held-item layer so a fishing line stays attached while
+/// the hand swings. A missing layer leaves the world-authority fallback untouched.
+fn fishing_line_anchors_for(
+    batch: &crate::presentation::actors::ActorPresentationBatch,
+    partial_tick: f32,
+) -> Vec<FishingLineAnchor> {
+    batch
+        .submissions
+        .iter()
+        .filter(|submission| {
+            submission.input.identity.layer == crate::presentation::equipment::LAYER_MAIN_HAND
+        })
+        .filter_map(|submission| {
+            let previous = submission.input.previous_bones.first().copied()?;
+            let current = submission.input.current_bones.first().copied()?;
+            let anchor = render_model::actor::sampled_bone_offset(
+                FISHING_ROD_TIP,
+                previous,
+                current,
+                submission.world_from_actor,
+                partial_tick,
+            )?;
+            Some(FishingLineAnchor {
+                runtime_id: submission.input.identity.runtime_id,
+                from: anchor.position,
+            })
+        })
+        .collect()
+}
+
 /// The local player's own first-person rig, built as a single instance placed in camera space.
 #[derive(Resource)]
 pub struct HandRigBuilder(pub ActorRigFrameBuilder);
@@ -387,6 +428,7 @@ pub fn prepare_actor_render_frame(
             &mut batch,
         );
     }
+    let fishing_line_anchors = fishing_line_anchors_for(&batch, step.partial_tick);
     drop(preparation);
     register_geometries(
         &mut params.hand_builder.0,
@@ -436,6 +478,7 @@ pub fn prepare_actor_render_frame(
             cull_view,
         ),
         step.partial_tick,
+        &fishing_line_anchors,
         (
             artwork.item_glint.clone(),
             render_model::ActorGlint {
@@ -475,3 +518,65 @@ mod xp_orb_tests;
 
 #[cfg(test)]
 mod billboard_frame_tests;
+
+#[cfg(test)]
+mod fishing_line_anchor_tests {
+    use std::sync::Arc;
+
+    use super::*;
+
+    #[test]
+    fn fishing_line_anchor_follows_the_interpolated_held_item_bone() {
+        let bone = |x| render_model::RenderBoneTransform {
+            rotation: [0.0, 0.0, 0.0, 1.0],
+            translation_scale: [x, 0.0, 0.0, 1.0],
+            axis_scale: render_model::UNIT_AXIS_SCALE,
+        };
+        let submission = render_model::ActorRigSubmission {
+            material: Default::default(),
+            culling_bounds: Default::default(),
+            input: render_model::ActorRigRenderInput {
+                identity: render_model::ActorRenderIdentity {
+                    session_id: 1,
+                    dimension: 0,
+                    runtime_id: 7,
+                    spawn_revision: 1,
+                    ingress_sequence: 1,
+                    source_tick: None,
+                    movement_revision: 0,
+                    pose_generation: render_api::PoseGeneration::new(1),
+                    layer: crate::presentation::equipment::LAYER_MAIN_HAND,
+                },
+                rig: render_model::EntityRigId(1),
+                previous_bones: Arc::from([bone(0.0)]),
+                current_bones: Arc::from([bone(1.0)]),
+                completed_tick: 1,
+                reset_generation: 0,
+            },
+            world_from_actor: [
+                [1.0, 0.0, 0.0, 10.0],
+                [0.0, 1.0, 0.0, 20.0],
+                [0.0, 0.0, 1.0, 30.0],
+            ],
+            texture_layer: 0,
+            route: render_model::ActorRigRoute::Compiled,
+            tint: 0,
+            uv_anim: render_model::IDENTITY_UV_ANIM,
+            light: 0,
+            overlay_rgba8: 0,
+        };
+        let batch = crate::presentation::actors::ActorPresentationBatch {
+            submissions: vec![submission],
+            skin_layers: Vec::new(),
+            artwork: Default::default(),
+        };
+
+        assert_eq!(
+            fishing_line_anchors_for(&batch, 0.5).as_slice(),
+            &[FishingLineAnchor {
+                runtime_id: 7,
+                from: [9.59375, 20.90625, 30.0],
+            }]
+        );
+    }
+}

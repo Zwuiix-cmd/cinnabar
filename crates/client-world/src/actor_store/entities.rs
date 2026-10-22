@@ -56,6 +56,8 @@ pub enum RopeKind {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RopeView {
     pub kind: RopeKind,
+    /// Runtime id of the actor holding a fishing rod; leads do not have an owner.
+    pub owner_runtime_id: Option<u64>,
     pub from: [f32; 3],
     pub to: [f32; 3],
 }
@@ -231,6 +233,7 @@ impl ActorStore {
                 };
                 ropes.push(RopeView {
                     kind: RopeKind::Lead,
+                    owner_runtime_id: None,
                     from: attach(actor),
                     to: attach(holder),
                 });
@@ -249,6 +252,7 @@ impl ActorStore {
             let (sine, cosine) = yaw.sin_cos();
             ropes.push(RopeView {
                 kind: RopeKind::FishingLine,
+                owner_runtime_id: Some(owner.runtime_id),
                 from: [
                     base[0] - sine * ROD_TIP_FORWARD + cosine * ROD_TIP_RIGHT,
                     base[1] + ROD_TIP_HEIGHT,
@@ -320,6 +324,7 @@ mod tests {
         let ropes = store.ropes(0.0);
         assert_eq!(ropes.len(), 1);
         assert_eq!(ropes[0].kind, RopeKind::FishingLine);
+        assert_eq!(ropes[0].owner_runtime_id, Some(1));
         assert_eq!(
             ropes[0].from,
             [ROD_TIP_RIGHT, ROD_TIP_HEIGHT, ROD_TIP_FORWARD]

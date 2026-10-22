@@ -383,6 +383,7 @@ impl DroppedItemPublisher<'_, '_> {
         collisions: Option<&dyn crate::observations::CollisionLookup>,
         camera: (Option<([f32; 3], f32)>, Option<ActorCullView>),
         partial_tick: f32,
+        fishing_line_anchors: &[crate::actor_publication::FishingLineAnchor],
         glint: (
             Option<render_model::EquipmentRaster>,
             render_model::ActorGlint,
@@ -640,8 +641,17 @@ impl DroppedItemPublisher<'_, '_> {
         if let Some((camera, _)) = camera {
             stream.authority().ropes_into(partial_tick, ropes);
             for rope in ropes.iter() {
-                let length = rope
-                    .from
+                let from = (rope.kind == RopeKind::FishingLine)
+                    .then_some(rope.owner_runtime_id)
+                    .flatten()
+                    .and_then(|runtime_id| {
+                        fishing_line_anchors
+                            .iter()
+                            .find(|anchor| anchor.runtime_id == runtime_id)
+                            .map(|anchor| anchor.from)
+                    })
+                    .unwrap_or(rope.from);
+                let length = from
                     .iter()
                     .zip(&rope.to)
                     .map(|(a, b)| (a - b) * (a - b))
@@ -662,7 +672,7 @@ impl DroppedItemPublisher<'_, '_> {
                     ),
                 };
                 rope_ribbon(
-                    rope.from, rope.to, camera, segments, sag, half_width, color, lines,
+                    from, rope.to, camera, segments, sag, half_width, color, lines,
                 );
             }
         }

@@ -17,6 +17,7 @@ pub mod test_support;
 mod tests;
 
 pub use display::FirstPersonHand;
+pub(crate) use display::LAYER_MAIN_HAND;
 pub use input::{local_input, remote_input};
 pub use runtime::{
     ActorEquipmentInput, EquipmentAnimation, EquipmentLayers, EquipmentPresentation, HeldKind,
