@@ -109,12 +109,14 @@ const INVENTORY_FENCE_BOXES: [([i8; 3], [i8; 3]); 8] = [
     ([7, 5, 16], [9, 7, 18]),
 ];
 
-/// The inventory fence's camera-facing faces, with the native position-derived UVs.
+/// Every outward face of the inventory fence, with native position-derived UVs. Held items
+/// draw these one-sided, so faces hidden from the inventory camera are kept.
 fn inventory_fence_quads(material: u32) -> impl Iterator<Item = GuiBlockQuad> {
     INVENTORY_FENCE_BOXES
         .into_iter()
         .flat_map(move |(min, max)| {
-            CUBE_FACES.map(|(face, unit, _, _)| {
+            BlockFace::ALL.map(|face| {
+                let (unit, _) = cube_face(face);
                 let corners = unit.map(|corner| {
                     std::array::from_fn(|axis| {
                         let [min, max] = [min[axis], max[axis]].map(f32::from);
@@ -291,14 +293,14 @@ mod tests {
             flags: MODEL_TEMPLATE_FLAG_FENCE_WOOD,
         };
         let quads = block_item_quads(VisualKind::Model, [7; 6], Some(0), &[template], &[]).unwrap();
-        assert_eq!(quads.len(), INVENTORY_FENCE_BOXES.len() * CUBE_FACES.len());
+        assert_eq!(
+            quads.len(),
+            INVENTORY_FENCE_BOXES.len() * BlockFace::ALL.len()
+        );
         let mut bounds = [[f32::INFINITY; 3], [f32::NEG_INFINITY; 3]];
         for quad in &quads {
             assert_eq!(quad.material, 7);
             assert!(quad.uvs.iter().flatten().all(|uv| (0.0..=1.0).contains(uv)));
-            let [a, b, c, _] = quad.corners.map(super::super::project_cube);
-            let area = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-            assert!(area < 0.0, "inventory fence faces must face the camera");
             for point in quad.corners {
                 for axis in 0..3 {
                     bounds[0][axis] = bounds[0][axis].min(point[axis]);
@@ -313,6 +315,12 @@ mod tests {
             .filter(|quad| quad.corners.iter().all(|point| point[1] == 1.0))
             .count();
         assert_eq!(tops, 2, "only the two posts reach the top");
+        // Held fences draw one-sided, so faces hidden from the inventory camera remain.
+        let post_east_faces = quads
+            .iter()
+            .filter(|quad| quad.corners.iter().all(|point| point[0] == 0.625))
+            .count();
+        assert_eq!(post_east_faces, 2);
     }
 
     #[test]
