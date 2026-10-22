@@ -682,6 +682,7 @@ fn fishing_rod_use_swings_without_consuming_the_stack() {
 
     assert_eq!(kinds(&outcome), ["use"]);
     assert!(outcome.swung);
+    assert_eq!(outcome.swing_source, Some(protocol::SwingSource::UseItem));
     assert!(runtime.take_inventory_change().is_none());
     assert!(runtime.step(&rod(105, true)).packets.is_empty());
 }

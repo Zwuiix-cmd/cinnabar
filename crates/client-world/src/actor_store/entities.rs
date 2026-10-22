@@ -86,6 +86,19 @@ pub fn tnt_presentation(fuse: f32) -> (f32, bool) {
 }
 
 impl ActorStore {
+    /// Reports whether an owned fishing hook is currently tracked for a player.
+    pub(crate) fn has_fishing_hook(&self, owner_unique_id: i64) -> bool {
+        self.effect_members
+            .ropes
+            .iter()
+            .filter_map(|runtime| self.actors.get(runtime))
+            .any(|actor| {
+                actor.entity_fact.native_class == NativeEntityClass::FishingHook
+                    && metadata_i64(actor, ActorDataKey::Owner.wire_value())
+                        == Some(owner_unique_id)
+            })
+    }
+
     /// Replaces `candidates` with every block actor's view and terrain-interlock visibility.
     pub(crate) fn block_entity_candidates_into(
         &self,
