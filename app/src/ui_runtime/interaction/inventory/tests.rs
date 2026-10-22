@@ -14,6 +14,7 @@ use ui_screens::container_actions::ReaderButton;
 const SIZE: [u32; 2] = [800, 600];
 
 mod ordered;
+mod scrollbar;
 
 #[test]
 fn mouse_back_preserves_an_earlier_inventory_click_in_the_same_frame() {
@@ -242,109 +243,6 @@ fn pointer_edge(
         None,
         0,
     );
-}
-
-#[test]
-fn engine_scrollbar_drag_moves_the_container_without_clicking_a_slot() {
-    let rect = json_ui::RectOut {
-        x: 0.0,
-        y: 0.0,
-        w: 100.0,
-        h: 100.0,
-    };
-    let region = json_ui::HitRegion {
-        key: "scroll".into(),
-        name: "scroll".into(),
-        kind: json_ui::HitKind::ScrollView,
-        rect,
-        clip: rect,
-        layer: 0,
-        order: 0,
-        pressed: None,
-        control_name: None,
-        collection_index: None,
-        collection: None,
-        enabled: true,
-        checked: None,
-        max_length: None,
-        group_index: None,
-        renderer: None,
-        drag_axes: [false; 2],
-        sound: None,
-        input: Default::default(),
-        focus: None,
-        collections: Vec::new(),
-        widget: Default::default(),
-        modal_root: None,
-        transform: None,
-    };
-    let frame = ui_engine::frame::EngineFrame {
-        hits: Arc::from([region]),
-        report: json_ui::LayoutReport {
-            scrolls: [(
-                "scroll".to_owned(),
-                json_ui::ScrollMetrics {
-                    content: 200.0,
-                    viewport: 100.0,
-                    viewport_rect: Some([0.0, 0.0, 100.0, 100.0]),
-                    track: Some([95.0, 0.0, 5.0, 100.0]),
-                    thumb: Some([95.0, 0.0, 5.0, 50.0]),
-                    box_drag: json_ui::Draggable::Vertical,
-                    track_button: Some("track".into()),
-                    ..Default::default()
-                },
-            )]
-            .into_iter()
-            .collect(),
-            ..Default::default()
-        },
-        cancel_target: None,
-        origin: [0.0; 2],
-        scale: 1.0,
-        panel: None,
-        edit_texts: Vec::new(),
-        top: Vec::new(),
-    };
-    let mut runtime = UiRuntime::new(1);
-    assert!(scroll_container(
-        &mut runtime,
-        &frame,
-        [97.0, 25.0],
-        &[],
-        true,
-        false,
-    ));
-    assert_eq!(
-        runtime.screen_state().container_scroll_drag,
-        Some(("scroll".into(), 25.0))
-    );
-    assert!(scroll_container(
-        &mut runtime,
-        &frame,
-        [97.0, 35.0],
-        &[],
-        false,
-        false,
-    ));
-    assert_eq!(runtime.screen_state().container_scroll["scroll"], 20.0);
-    assert!(scroll_container(
-        &mut runtime,
-        &frame,
-        [97.0, 45.0],
-        &[],
-        false,
-        false,
-    ));
-    assert_eq!(runtime.screen_state().container_scroll["scroll"], 40.0);
-    assert!(scroll_container(
-        &mut runtime,
-        &frame,
-        [97.0, 45.0],
-        &[],
-        false,
-        true,
-    ));
-    assert!(runtime.screen_state().container_scroll_drag.is_none());
 }
 
 #[test]

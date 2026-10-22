@@ -210,12 +210,16 @@ pub(super) fn apply_inventory_pointer(
         runtime.set_inventory_pointer_gui(None);
         runtime.screen_state_mut().hover = None;
         runtime.screen_state_mut().container_close_armed = false;
+        runtime.screen_state_mut().container_scroll_drag = None;
+        runtime.screen_state_mut().pointer.reset();
         return;
     };
     let Ok(point) = UiPoint::new(position.x, position.y) else {
         runtime.set_inventory_pointer_gui(None);
         runtime.screen_state_mut().hover = None;
         runtime.screen_state_mut().container_close_armed = false;
+        runtime.screen_state_mut().container_scroll_drag = None;
+        runtime.screen_state_mut().pointer.reset();
         return;
     };
     let physical_size = [window.physical_width(), window.physical_height()];
@@ -225,6 +229,9 @@ pub(super) fn apply_inventory_pointer(
     let mod_owned = presentation
         .mod_ui()
         .mod_screens_own([point.x(), point.y()]);
+    if mod_owned || gui.is_none() || presentation.engine_container_frame().is_none() {
+        runtime.screen_state_mut().container_scroll_drag = None;
+    }
     if mod_owned || screen == InventoryScreen::Book {
         runtime.screen_state_mut().container_close_armed = false;
     }
@@ -348,7 +355,7 @@ pub(super) fn apply_inventory_pointer(
 #[cfg(test)]
 mod tests;
 
-/// Wheel notches over an engine-drawn screen scroll the view under the pointer.
+/// Applies scrolling and reports whether a scrollbar owns this frame's pointer edges.
 pub(super) fn scroll_container(
     runtime: &mut UiRuntime,
     frame: &ui_engine::frame::EngineFrame,
@@ -364,10 +371,16 @@ pub(super) fn scroll_container(
             runtime.screen_state_mut().container_scroll_drag = None;
             return true;
         }
-        let Some(view) = frame.hits.iter().find(|view| view.key == key) else {
+        let Some(view) = frame
+            .hits
+            .iter()
+            .find(|view| view.key == key && view.enabled)
+        else {
+            runtime.screen_state_mut().container_scroll_drag = None;
             return true;
         };
         let Some(metrics) = frame.report.scrolls.get(&key) else {
+            runtime.screen_state_mut().container_scroll_drag = None;
             return true;
         };
         // `apply_inventory_pointer` clears ButtonInput after routing the frame so a held
@@ -393,47 +406,78 @@ pub(super) fn scroll_container(
         runtime.screen_state_mut().container_scroll_drag = Some((view.key.clone(), at));
         return true;
     }
+    if primary_pressed {
+        for view in frame.hits.iter().rev() {
+            if view.kind == json_ui::HitKind::Modal
+                && view.contains(point)
+                && !view.input.inline_modal
+            {
+                break;
+            }
+            if view.kind != json_ui::HitKind::ScrollView || !view.enabled {
+                continue;
+            }
+            let Some(metrics) = frame.report.scrolls.get(&view.key) else {
+                continue;
+            };
+            let clip = view.clip;
+            if point[0] < clip.x
+                || point[0] >= clip.x + clip.w
+                || point[1] < clip.y
+                || point[1] >= clip.y + clip.h
+                || view
+                    .transform
+                    .is_some_and(|transform| transform.inverse().is_none())
+                || metrics.bar_visible == Some(false)
+            {
+                continue;
+            }
+            let local = view.local(point);
+            let contains = |rect: Option<[f64; 4]>| {
+                rect.is_some_and(|rect| {
+                    local[0] >= rect[0]
+                        && local[0] < rect[0] + rect[2]
+                        && local[1] >= rect[1]
+                        && local[1] < rect[1] + rect[3]
+                })
+            };
+            let on_thumb = contains(metrics.thumb);
+            if !on_thumb && !contains(metrics.track) {
+                continue;
+            }
+            runtime.screen_state_mut().pointer.reset();
+            if on_thumb {
+                let draggable = if metrics.horizontal {
+                    matches!(
+                        metrics.box_drag,
+                        json_ui::Draggable::Horizontal | json_ui::Draggable::Both
+                    )
+                } else {
+                    matches!(
+                        metrics.box_drag,
+                        json_ui::Draggable::Vertical | json_ui::Draggable::Both
+                    )
+                };
+                if draggable && !primary_released {
+                    let axis = usize::from(!metrics.horizontal);
+                    runtime.screen_state_mut().container_scroll_drag =
+                        Some((view.key.clone(), local[axis]));
+                }
+            } else if metrics.track_button.is_some() {
+                runtime
+                    .screen_state_mut()
+                    .container_scroll
+                    .insert(view.key.clone(), metrics.offset_for_track(local));
+            }
+            return true;
+        }
+    }
     let Some(view) = json_ui::scroll_target(&frame.hits, &frame.report, point) else {
         return false;
     };
     let Some(metrics) = frame.report.scrolls.get(&view.key) else {
         return false;
     };
-    let local = view.local(point);
-    let contains = |rect: Option<[f64; 4]>| {
-        rect.is_some_and(|rect| {
-            local[0] >= rect[0]
-                && local[0] < rect[0] + rect[2]
-                && local[1] >= rect[1]
-                && local[1] < rect[1] + rect[3]
-        })
-    };
-    if primary_pressed && contains(metrics.track) {
-        if contains(metrics.thumb) {
-            let draggable = if metrics.horizontal {
-                matches!(
-                    metrics.box_drag,
-                    json_ui::Draggable::Horizontal | json_ui::Draggable::Both
-                )
-            } else {
-                matches!(
-                    metrics.box_drag,
-                    json_ui::Draggable::Vertical | json_ui::Draggable::Both
-                )
-            };
-            if draggable {
-                let axis = usize::from(!metrics.horizontal);
-                runtime.screen_state_mut().container_scroll_drag =
-                    Some((view.key.clone(), local[axis]));
-            }
-        } else if metrics.track_button.is_some() {
-            runtime
-                .screen_state_mut()
-                .container_scroll
-                .insert(view.key.clone(), metrics.offset_for_track(local));
-        }
-        return true;
-    }
     let mut offset = runtime
         .screen_state()
         .container_scroll
@@ -458,7 +502,7 @@ pub(super) fn scroll_container(
             .container_scroll
             .insert(view.key.clone(), offset);
     }
-    !notches.is_empty()
+    false
 }
 
 /// Syncs `swings` to the movement `authority` before swinging for `tick`, so the later swing

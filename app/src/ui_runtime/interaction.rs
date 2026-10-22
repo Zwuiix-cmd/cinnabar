@@ -112,6 +112,7 @@ pub(crate) fn drive_inventory_ui_actions(
     let (presses, shift, control) = runtime.inventory_keys_mut().take_frame();
     if runtime.credits().owns_input() || runtime.server_forms().owns_input() {
         runtime.screen_state_mut().container_close_armed = false;
+        runtime.screen_state_mut().container_scroll_drag = None;
         return;
     }
     if menu.as_ref().is_some_and(|menu| menu.is_visible())
@@ -119,6 +120,7 @@ pub(crate) fn drive_inventory_ui_actions(
         || !input_available
     {
         runtime.screen_state_mut().container_close_armed = false;
+        runtime.screen_state_mut().container_scroll_drag = None;
         runtime.set_inventory_pointer_gui(None);
         runtime.screen_state_mut().hover = None;
         runtime.screen_state_mut().pointer.reset();
