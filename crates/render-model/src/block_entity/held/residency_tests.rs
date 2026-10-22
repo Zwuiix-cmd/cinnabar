@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 fn texture_names(kind: HeldBlockEntity) -> Vec<String> {
     use assets::block_entity_geometry as geometry;
     match kind {
-        HeldBlockEntity::Chest(key) => vec![key.variant().texture_path(false)],
+        HeldBlockEntity::Chest(key) => vec![key.variant().texture(false)],
         HeldBlockEntity::Shulker(color) => vec![geometry::shulker_texture(color)],
         HeldBlockEntity::DecoratedPot => vec![
             geometry::POT_BASE_TEXTURE.0.to_owned(),

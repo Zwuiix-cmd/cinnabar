@@ -169,10 +169,9 @@ struct Routing<'a> {
     stream: &'a WorldStream,
     mode: NetworkIdMode,
     icons: Option<&'a RuntimeIconCatalog>,
-    collisions: Option<&'a PhysicsCollisionRegistries>,
-    block_entity_atlas: Option<&'a render_model::BlockEntityAtlas>,
 }
 
+/// Emits destruction particles using an already-resolved block tile.
 fn spawn_block_break(system: &mut ParticleSystem, block: [i32; 3], found: BlockTile) {
     system.spawn_terrain(&block_break_request(
         BLOCK_BREAK_EFFECT,
@@ -196,14 +195,7 @@ fn route_block_break(
     block: [i32; 3],
     now: f64,
 ) {
-    let found = block_tile(
-        routing.stream,
-        routing.mode,
-        runtime_id as u32,
-        block,
-        routing.collisions,
-        routing.block_entity_atlas,
-    );
+    let found = block_tile(routing.stream, routing.mode, runtime_id as u32, block);
     if !admit_break_echo(echoes, origin, block, now, found.is_some()) {
         return;
     }
@@ -236,14 +228,7 @@ fn spawn_crack(system: &mut ParticleSystem, routing: &Routing<'_>, block: [i32; 
     let Some(runtime_id) = routing.world.block_runtime_id(block) else {
         return;
     };
-    if let Some(found) = block_tile(
-        routing.stream,
-        routing.mode,
-        runtime_id,
-        block,
-        routing.collisions,
-        routing.block_entity_atlas,
-    ) {
+    if let Some(found) = block_tile(routing.stream, routing.mode, runtime_id, block) {
         system.spawn_terrain(&block_crack_request(
             BLOCK_BREAK_EFFECT,
             block,
@@ -293,12 +278,15 @@ fn route_level_event(
     system: &mut ParticleSystem,
     routing: &Routing<'_>,
     break_echoes: &mut client_audio::audio::EchoLedger,
-    event_id: i32,
-    position: [f32; 3],
-    data: i32,
+    event: &protocol::LevelParticleEvent,
     now: f64,
     sequence: u64,
 ) {
+    let protocol::LevelParticleEvent {
+        event_id,
+        position,
+        data,
+    } = *event;
     match classify_level_event(event_id, data) {
         Some(LevelParticle::DragonEggTeleport { displacement }) => {
             for request in dragon_egg_teleport_requests(position, displacement, sequence) {
@@ -324,14 +312,8 @@ fn route_level_event(
         }
         Some(LevelParticle::Terrain { runtime_id }) => {
             let block = floor_cell(position);
-            if let Some(found) = block_tile(
-                routing.stream,
-                routing.mode,
-                runtime_id as u32,
-                block,
-                routing.collisions,
-                routing.block_entity_atlas,
-            ) {
+            if let Some(found) = block_tile(routing.stream, routing.mode, runtime_id as u32, block)
+            {
                 system.spawn(&terrain_request(
                     BLOCK_BREAK_EFFECT,
                     block,
@@ -537,7 +519,6 @@ type ParticleFrameContext<'w, 's> = (
     Res<'w, crate::runtime::visibility::CaveVisibilityCache>,
     Option<Res<'w, render_scene::RuntimeStageProfiler>>,
     Option<Res<'w, client_presentation::actor_publication::CosmeticEmitterPlacements>>,
-    Option<Res<'w, render_scene::BlockEntitySceneResource>>,
     Local<'s, CosmeticEmitters>,
 );
 
@@ -561,10 +542,7 @@ fn drive_particles(
     (mut block_cues, mut eating_cues, camera_settings, server_camera): ParticleCues<'_, '_>,
     mut break_echoes: Local<client_audio::audio::EchoLedger>,
     mut ambient: Local<AmbientParticles>,
-    (cave, profiler, cosmetic_placements, block_entity_scene, mut cosmetics): ParticleFrameContext<
-        '_,
-        '_,
-    >,
+    (cave, profiler, cosmetic_placements, mut cosmetics): ParticleFrameContext<'_, '_>,
 ) {
     let (time, actor_alpha) = frame_time;
     // Timed inside the system: a span around it would also count systems ordered in between.
@@ -608,10 +586,6 @@ fn drive_particles(
         stream,
         mode,
         icons: icons.as_ref().map(|icons| &*icons.0),
-        collisions: Some(&collisions),
-        block_entity_atlas: block_entity_scene
-            .as_deref()
-            .and_then(|scene| scene.atlas().map(std::sync::Arc::as_ref)),
     };
     let view = particle_view(&(*transform).into(), projection);
     let first_person = client_presentation::camera::hand_first_person(
@@ -657,9 +631,7 @@ fn drive_particles(
                     &mut system,
                     &routing,
                     &mut break_echoes,
-                    level.event_id,
-                    level.position,
-                    level.data,
+                    level,
                     time.elapsed_secs_f64(),
                     committed.sequence,
                 );

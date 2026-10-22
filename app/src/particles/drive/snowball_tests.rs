@@ -52,8 +52,6 @@ fn snowball_packets_each_emit_one_fragment_through_the_app_route() {
         stream: &stream,
         mode: NetworkIdMode::Sequential,
         icons: Some(&icons),
-        collisions: None,
-        block_entity_atlas: None,
     };
     let mut system = system();
     let mut break_echoes = client_audio::audio::EchoLedger::default();
@@ -62,9 +60,11 @@ fn snowball_packets_each_emit_one_fragment_through_the_app_route() {
             &mut system,
             &routing,
             &mut break_echoes,
-            2009,
-            [1.0, 2.0, 3.0],
-            15,
+            &protocol::LevelParticleEvent {
+                event_id: 2009,
+                position: [1.0, 2.0, 3.0],
+                data: 15,
+            },
             0.0,
             0,
         );

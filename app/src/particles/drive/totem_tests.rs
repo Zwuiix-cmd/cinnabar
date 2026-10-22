@@ -74,8 +74,6 @@ fn route(system: &mut ParticleSystem, stream: &WorldStream, runtime_id: u64) {
         stream,
         mode: NetworkIdMode::Sequential,
         icons: None,
-        collisions: None,
-        block_entity_atlas: None,
     };
     route_notice(
         system,

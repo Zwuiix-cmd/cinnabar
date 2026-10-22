@@ -63,8 +63,6 @@ fn feed_notices_scatter_only_admitted_food_and_do_not_duplicate_local_bites() {
             stream: &stream,
             mode: NetworkIdMode::Sequential,
             icons: Some(&icons),
-            collisions: None,
-            block_entity_atlas: None,
         };
         for runtime_id in [stream.local_player_runtime_id(), 42] {
             let mut system = ParticleSystem::default();
