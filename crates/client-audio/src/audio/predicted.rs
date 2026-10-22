@@ -52,6 +52,14 @@ pub struct MiningAudio {
     hit_timer: f32,
 }
 
+/// A predicted block sound with the material captured before the world changes.
+struct BlockSoundCue {
+    event: &'static str,
+    identifier: Option<String>,
+    component_material: Option<String>,
+    cell: [i32; 3],
+}
+
 fn center(cell: [i32; 3]) -> [f32; 3] {
     cell.map(|axis| axis as f32 + 0.5)
 }
@@ -104,7 +112,7 @@ pub fn drive_block_cues(
         stream.current_dimension(),
         Default::default(),
     );
-    let mut requests: Vec<(&'static str, Option<String>, Option<String>, [i32; 3])> = Vec::new();
+    let mut requests = Vec::new();
     for cue in cues.read() {
         let (event, position, block_runtime_id) = match *cue {
             LocalBlockCue::Place {
@@ -117,14 +125,14 @@ pub fn drive_block_cues(
             } => ("break", position, block_runtime_id),
         };
         let runtime_id = block_runtime_id as u32;
-        requests.push((
+        requests.push(BlockSoundCue {
             event,
-            lookup(runtime_id),
-            collisions
+            identifier: lookup(runtime_id),
+            component_material: collisions
                 .block_sound_material(mode, runtime_id)
                 .map(str::to_owned),
-            position,
-        ));
+            cell: position,
+        });
     }
     let target = survival
         .and_then(|survival| survival.destroying_target())
@@ -152,7 +160,12 @@ pub fn drive_block_cues(
                     (identifier.clone(), component_material.clone())
                 })
                 .unwrap_or_default();
-            requests.push(("hit", identifier, component_material, cell));
+            requests.push(BlockSoundCue {
+                event: "hit",
+                identifier,
+                component_material,
+                cell,
+            });
         }
     }
     let built: Vec<(&'static str, [i32; 3], SoundRequest)> = {
@@ -160,16 +173,23 @@ pub fn drive_block_cues(
         let tables = bank.tables();
         requests
             .into_iter()
-            .filter_map(|(event, identifier, component_material, cell)| {
-                let identifier = identifier?;
-                let material =
-                    tables.material_of_with_component(&identifier, component_material.as_deref());
-                let route = tables.block(material, event)?;
-                let request = SoundRequest::new(route.sound)
-                    .with_ranges(route.volume, route.pitch)
-                    .at(center(cell));
-                Some((event, cell, request))
-            })
+            .filter_map(
+                |BlockSoundCue {
+                     event,
+                     identifier,
+                     component_material,
+                     cell,
+                 }| {
+                    let identifier = identifier?;
+                    let material = tables
+                        .material_of_with_component(&identifier, component_material.as_deref());
+                    let route = tables.block(material, event)?;
+                    let request = SoundRequest::new(route.sound)
+                        .with_ranges(route.volume, route.pitch)
+                        .at(center(cell));
+                    Some((event, cell, request))
+                },
+            )
             .collect()
     };
     for (event, cell, request) in built {
