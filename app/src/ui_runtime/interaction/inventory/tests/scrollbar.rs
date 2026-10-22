@@ -39,6 +39,7 @@ fn frame() -> ui_engine::frame::EngineFrame {
     let mut track = region.clone();
     track.key = "scroll/track".into();
     track.kind = json_ui::HitKind::ScrollTrack;
+    track.pressed = Some("track".into());
     track.rect = json_ui::RectOut {
         x: 95.0,
         y: 0.0,
@@ -399,4 +400,24 @@ fn a_new_press_replaces_an_older_scrollbar_capture() {
         false,
     ));
     assert!(runtime.screen_state().container_scroll_drag.is_none());
+}
+
+#[test]
+fn track_presses_follow_the_configured_button_mapping() {
+    for mapping in [None, Some("other"), Some("track")] {
+        let mut frame = frame();
+        Arc::make_mut(&mut frame.hits)[1].pressed = mapping.map(str::to_owned);
+        let mut runtime = UiRuntime::new(1);
+        assert_eq!(
+            scroll_container(&mut runtime, &frame, [97.0, 75.0], &[], true, false),
+            mapping == Some("track")
+        );
+        assert_eq!(
+            runtime
+                .screen_state()
+                .container_scroll
+                .contains_key("scroll"),
+            mapping == Some("track")
+        );
+    }
 }

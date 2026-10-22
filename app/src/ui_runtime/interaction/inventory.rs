@@ -424,6 +424,11 @@ pub(super) fn scroll_container(
             if !on_thumb && !on_track {
                 continue;
             }
+            if on_track
+                && (metrics.track_button.is_none() || target.pressed != metrics.track_button)
+            {
+                return false;
+            }
             runtime.screen_state_mut().pointer.reset();
             if on_thumb {
                 let draggable = if metrics.horizontal {
@@ -443,7 +448,7 @@ pub(super) fn scroll_container(
                     runtime.screen_state_mut().container_scroll_drag =
                         Some((view.key.clone(), local[axis]));
                 }
-            } else if metrics.track_button.is_some() {
+            } else {
                 runtime.screen_state_mut().container_scroll.insert(
                     view.key.clone(),
                     metrics.offset_for_track(view.local(point)),
