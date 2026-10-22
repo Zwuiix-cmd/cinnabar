@@ -104,6 +104,7 @@ impl EquipmentRuntime {
         )
     }
 
+    /// Places an admitted mesh under the native first-person hand transform.
     fn first_person_item_from_mesh(
         &mut self,
         body: &ActorRigSubmission,

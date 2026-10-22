@@ -77,9 +77,16 @@ impl UiPresentationRuntime {
                 .flatten()
                 .copied()
                 .collect::<BTreeSet<_>>();
+        let same_worn = pack
+            .worn
+            .iter()
+            .flatten()
+            .map(Box::as_ref)
+            .collect::<BTreeSet<_>>()
+            == worn.iter().flatten().copied().collect::<BTreeSet<_>>();
         pack.worn = worn.map(|texture| texture.map(Box::from));
         pack.held = held.map(|texture| texture.map(Box::from));
-        if !same_set {
+        if !same_set || !same_worn {
             self.place_pack_armor();
         }
     }

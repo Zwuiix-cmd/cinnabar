@@ -278,6 +278,7 @@ impl EquipmentRuntime {
         Some((mesh, location, glint_span(placement.uv_rect(), false)))
     }
 
+    /// Resolves an item's startup sprite and its admitted atlas placement together.
     fn held_icon_parts(&self, item: &WornItem) -> Option<(usize, Placement, ActorArtworkLocation)> {
         let index = self.held_icon_index(item)?;
         let placement = self.placements.get(index).copied().flatten()?;

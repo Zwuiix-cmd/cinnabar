@@ -300,7 +300,7 @@ impl EquipmentRuntime {
             selected_geometries: Default::default(),
             startup_geometries: geometries.iter().copied().map(equipment_rig_id).collect(),
             dial_frames: Default::default(),
-            show_custom_item_models: true,
+            show_custom_item_models: ui::DEFAULT_SHOW_CUSTOM_ITEM_MODELS,
             external_armor: external_armor::ExternalArmor::new(catalog.as_deref()),
             assets,
             icons,

@@ -8,6 +8,7 @@ use client_world::ActorSnapshot;
 
 use super::*;
 
+/// Suppresses authored hand geometry only when it comes from a server pack.
 fn should_fallback_to_icon(show_custom_item_models: bool, from_pack: bool) -> bool {
     !show_custom_item_models && from_pack
 }

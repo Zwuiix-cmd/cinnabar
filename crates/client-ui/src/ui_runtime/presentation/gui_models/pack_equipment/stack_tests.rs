@@ -164,7 +164,7 @@ fn stack_armor_beyond_the_model_atlas_still_dresses_every_slot_with_pack_art() {
 }
 
 #[test]
-fn worn_armor_claims_the_last_gui_page_before_a_held_pack_model() {
+fn worn_armor_keeps_gui_page_priority_when_hand_and_armor_textures_swap() {
     let mut presentation = presentation();
     let side = render_model::UI_MODEL_ATLAS_SIDE;
     let full =
@@ -197,6 +197,19 @@ fn worn_armor_claims_the_last_gui_page_before_a_held_pack_model() {
             .pack_equipment
             .regions
             .contains_key("pack/a_held")
+    );
+
+    presentation.wear_pack_equipment(
+        [None, Some("pack/a_held"), None, None],
+        [Some("pack/z_chest"), None],
+    );
+    assert!(presentation.gui_models.pack_equipment.region(1).is_some());
+    assert!(
+        !presentation
+            .gui_models
+            .pack_equipment
+            .regions
+            .contains_key("pack/z_chest")
     );
 }
 

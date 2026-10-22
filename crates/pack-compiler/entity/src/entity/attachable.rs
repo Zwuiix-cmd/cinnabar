@@ -261,6 +261,7 @@ fn category(item_identifier: &str, geometry: &str) -> EquipmentCategory {
     category_with_script_slot(item_identifier, geometry, None, false)
 }
 
+/// Prefers item and geometry slot facts, then the supported authored script branches.
 fn category_with_script_slot(
     item_identifier: &str,
     geometry: &str,

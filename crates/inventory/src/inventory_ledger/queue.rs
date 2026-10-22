@@ -440,9 +440,7 @@ impl PlayerInventoryLedger {
                 }
                 self.require_rollback_recovery(cell);
             }
-            if self.confirmed.set(cell, backing) && !rejected && cell == Cell::Offhand {
-                self.offhand_written = true;
-            }
+            self.confirmed.set(cell, backing);
             if rejected
                 && to.is_none()
                 && let Some(previous) = self.queue.iter_mut().rev().find(|previous| {
@@ -603,8 +601,16 @@ impl PlayerInventoryLedger {
             .find(|consumed| consumed.cell == requested);
         let count = u16::from(correction.count)
             .saturating_sub(consumed.map_or(0, |consumed| consumed.amount));
-        let mut held = prediction
-            .and_then(|prediction| prediction.held.as_ref().or(prediction.before.as_ref()))
+        // A derived result is only the client's estimate, so a restatement after submission
+        // supersedes it; other predictions keep their exact snapshot.
+        let restated = prediction
+            .filter(|prediction| !prediction.current && request.predicts_derived_result())
+            .and_then(|_| self.confirmed.get(cell));
+        let mut held = restated
+            .or_else(|| {
+                prediction
+                    .and_then(|prediction| prediction.held.as_ref().or(prediction.before.as_ref()))
+            })
             .or_else(|| {
                 request
                     .mining

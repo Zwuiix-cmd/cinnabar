@@ -7,6 +7,8 @@ pub use view_bobbing::ViewBobbing;
 
 pub const CURRENT_SETTINGS_SCHEMA: u32 = 2;
 pub const DEFAULT_OUTLINE_SELECTION: bool = true;
+/// Server-pack held models are enabled until the player chooses item icons.
+pub const DEFAULT_SHOW_CUSTOM_ITEM_MODELS: bool = true;
 /// Default and slider bounds for the field-of-view option, in degrees.
 pub const DEFAULT_FOV_DEGREES: i32 = 60;
 pub const MIN_FOV_DEGREES: i32 = 30;
@@ -187,6 +189,7 @@ pub struct VideoSettings {
     pub smaa_mode: SmaaMode,
     pub ui_scale: f32,
     pub render_distance_chunks: u8,
+    pub chunk_occlusion_culling: bool,
     pub brightness: f32,
     pub render_mode: RenderMode,
     /// File or folder name of the selected Java shader pack inside the shader-pack
@@ -226,6 +229,7 @@ impl Default for VideoSettings {
             smaa_mode: DEFAULT_SMAA_MODE,
             ui_scale: 1.0,
             render_distance_chunks: MIN_RENDER_DISTANCE_CHUNKS,
+            chunk_occlusion_culling: render_api::DEFAULT_CHUNK_OCCLUSION_CULLING,
             brightness: 0.5,
             render_mode: RenderMode::Vanilla,
             shader_pack: None,
@@ -237,7 +241,7 @@ impl Default for VideoSettings {
             outline_selection: DEFAULT_OUTLINE_SELECTION,
             damage_bob: 1.0,
             java_animations: false,
-            show_custom_item_models: true,
+            show_custom_item_models: DEFAULT_SHOW_CUSTOM_ITEM_MODELS,
             native_skybox_offset: assets::DEFAULT_NATIVE_SKYBOX_OFFSET,
             // Far terrain has no setting while it is disabled.
             far_terrain: render_api::far_terrain::FarTerrainMode::Off,

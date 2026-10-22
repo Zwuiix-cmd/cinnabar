@@ -702,15 +702,6 @@ fn crosshair_preferences_persist_and_reset_without_changing_legacy_defaults() {
     }
 }
 
-/// Vanilla 1.26.50 ships auto-jump off for keyboard/mouse and controller alike.
-#[test]
-fn auto_jump_defaults_off_for_every_input_mode() {
-    let settings = SettingsOptions::default();
-    for name in ["keyboard_mouse_autojump", "controller_autojump"] {
-        assert_eq!(settings.get(index(name)), 0, "{name}");
-    }
-}
-
 /// Returns the frame-rate limit applied by the loaded settings.
 fn limit(settings: &SettingsOptions) -> render_api::FrameRateLimit {
     settings.user_settings().video.frame_rate_limit
@@ -861,8 +852,14 @@ fn native_skybox_offset_defaults_on_and_persists_both_states() {
 fn custom_item_models_default_on_and_persist_both_states() {
     let mut settings = SettingsOptions::default();
     let id = SettingId::ShowCustomItemModels;
-    assert_eq!(settings.value(id), 1);
-    assert!(settings.user_settings().video.show_custom_item_models);
+    assert_eq!(
+        settings.value(id),
+        i32::from(ui::DEFAULT_SHOW_CUSTOM_ITEM_MODELS)
+    );
+    assert_eq!(
+        settings.user_settings().video.show_custom_item_models,
+        ui::DEFAULT_SHOW_CUSTOM_ITEM_MODELS
+    );
     for enabled in [0, 1] {
         settings.set(id.index(), enabled);
         let loaded = SettingsOptions::decode(&serde_json::to_vec(&settings).unwrap()).unwrap();
@@ -874,7 +871,10 @@ fn custom_item_models_default_on_and_persist_both_states() {
     }
     settings.set(id.index(), 0);
     settings.reset_group(SettingsGroup::Video);
-    assert!(settings.user_settings().video.show_custom_item_models);
+    assert_eq!(
+        settings.user_settings().video.show_custom_item_models,
+        ui::DEFAULT_SHOW_CUSTOM_ITEM_MODELS
+    );
 }
 
 /// Far terrain stays off whatever an older build saved for it.

@@ -321,7 +321,7 @@ pub(super) fn vanilla_hand_source(
         });
         let layer = modern.or_else(|| {
             if index == 0 {
-                let item = if icon_fallback {
+                if icon_fallback {
                     equipment.first_person_item_icon_with_use(
                         &presentation.submission,
                         item,
@@ -369,8 +369,7 @@ pub(super) fn vanilla_hand_source(
                                 ..Default::default()
                             }),
                     )
-                };
-                item
+                }
             } else if icon_fallback {
                 equipment.first_person_offhand_icon(&presentation.submission, item)
             } else {
