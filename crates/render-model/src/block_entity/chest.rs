@@ -49,7 +49,7 @@ impl ChestVariant {
     }
 
     /// Returns the pack-relative texture path for this chest layout.
-    pub(super) fn texture(self, double: bool) -> String {
+    pub fn texture_path(self, double: bool) -> String {
         let stem = match self {
             Self::Normal => "normal",
             Self::Trapped => "trapped",
@@ -118,7 +118,8 @@ pub(super) fn emit(
             [128.0, 64.0],
         ),
     };
-    let Some(texture) = builder.required_texture(atlas, &model.variant.texture(double), logical)
+    let Some(texture) =
+        builder.required_texture(atlas, &model.variant.texture_path(double), logical)
     else {
         return;
     };
@@ -169,15 +170,15 @@ mod tests {
     #[test]
     fn texture_names_cover_double_and_variant_forms() {
         assert_eq!(
-            ChestVariant::Normal.texture(true),
+            ChestVariant::Normal.texture_path(true),
             "textures/entity/chest/double_normal"
         );
         assert_eq!(
-            ChestVariant::Trapped.texture(true),
+            ChestVariant::Trapped.texture_path(true),
             "textures/entity/chest/trapped_double"
         );
         assert_eq!(
-            ChestVariant::Copper(CopperAge::Exposed).texture(false),
+            ChestVariant::Copper(CopperAge::Exposed).texture_path(false),
             "textures/entity/chest/copper_exposed"
         );
     }

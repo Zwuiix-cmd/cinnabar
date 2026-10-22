@@ -52,6 +52,8 @@ fn snowball_packets_each_emit_one_fragment_through_the_app_route() {
         stream: &stream,
         mode: NetworkIdMode::Sequential,
         icons: Some(&icons),
+        collisions: None,
+        block_entity_atlas: None,
     };
     let mut system = system();
     let mut break_echoes = client_audio::audio::EchoLedger::default();
