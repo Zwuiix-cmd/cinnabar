@@ -48,7 +48,7 @@ pub enum LocalBlockCue {
 
 #[derive(Debug, Default)]
 pub struct MiningAudio {
-    target: Option<([i32; 3], Option<String>)>,
+    target: Option<([i32; 3], Option<String>, Option<String>)>,
     hit_timer: f32,
 }
 
@@ -104,7 +104,7 @@ pub fn drive_block_cues(
         stream.current_dimension(),
         Default::default(),
     );
-    let mut requests: Vec<(&'static str, Option<String>, [i32; 3])> = Vec::new();
+    let mut requests: Vec<(&'static str, Option<String>, Option<String>, [i32; 3])> = Vec::new();
     for cue in cues.read() {
         let (event, position, block_runtime_id) = match *cue {
             LocalBlockCue::Place {
@@ -116,25 +116,43 @@ pub fn drive_block_cues(
                 block_runtime_id,
             } => ("break", position, block_runtime_id),
         };
-        requests.push((event, lookup(block_runtime_id as u32), position));
+        let runtime_id = block_runtime_id as u32;
+        requests.push((
+            event,
+            lookup(runtime_id),
+            collisions
+                .block_sound_material(mode, runtime_id)
+                .map(str::to_owned),
+            position,
+        ));
     }
     let target = survival
         .and_then(|survival| survival.destroying_target())
         .map(|(cell, _face)| cell);
-    let previous = mining.target.as_ref().map(|(cell, _)| *cell);
+    let previous = mining.target.as_ref().map(|(cell, _, _)| *cell);
     if target != previous {
         mining.hit_timer = 0.0;
         mining.target = target.map(|cell| {
+            let runtime_id = palette.primary_runtime_id(cell).ok();
             let identifier = identifier_ref(&palette, collisions, mode, cell).map(str::to_owned);
-            (cell, identifier)
+            let component_material = runtime_id
+                .and_then(|runtime_id| collisions.block_sound_material(mode, runtime_id))
+                .map(str::to_owned);
+            (cell, identifier, component_material)
         });
     }
-    if let Some(cell) = mining.target.as_ref().map(|(cell, _)| *cell) {
+    if let Some(cell) = mining.target.as_ref().map(|(cell, _, _)| *cell) {
         mining.hit_timer -= time.delta_secs();
         if mining.hit_timer <= 0.0 {
             mining.hit_timer = HIT_INTERVAL;
-            let identifier = mining.target.as_ref().and_then(|(_, id)| id.clone());
-            requests.push(("hit", identifier, cell));
+            let (identifier, component_material) = mining
+                .target
+                .as_ref()
+                .map(|(_, identifier, component_material)| {
+                    (identifier.clone(), component_material.clone())
+                })
+                .unwrap_or_default();
+            requests.push(("hit", identifier, component_material, cell));
         }
     }
     let built: Vec<(&'static str, [i32; 3], SoundRequest)> = {
@@ -142,8 +160,10 @@ pub fn drive_block_cues(
         let tables = bank.tables();
         requests
             .into_iter()
-            .filter_map(|(event, identifier, cell)| {
-                let material = tables.material_of(identifier.as_deref()?)?;
+            .filter_map(|(event, identifier, component_material, cell)| {
+                let identifier = identifier?;
+                let material =
+                    tables.material_of_with_component(&identifier, component_material.as_deref());
                 let route = tables.block(material, event)?;
                 let request = SoundRequest::new(route.sound)
                     .with_ranges(route.volume, route.pitch)

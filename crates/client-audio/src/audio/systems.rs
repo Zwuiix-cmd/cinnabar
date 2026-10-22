@@ -123,13 +123,18 @@ impl IngestState {
         &mut self,
         level: &protocol::LevelAudioEvent,
         block_identifier: &dyn Fn(u32) -> Option<String>,
+        component_material: Option<&str>,
         engine: &mut AudioEngine,
     ) {
         let stop = &*level.sound_event == RECORD_STOP_SOUND;
-        let request = (!stop)
-            .then(|| engine.bank())
-            .flatten()
-            .and_then(|bank| route::level_sound_request(bank.tables(), level, block_identifier));
+        let request = (!stop).then(|| engine.bank()).flatten().and_then(|bank| {
+            route::level_sound_request_with_component_material(
+                bank.tables(),
+                level,
+                block_identifier,
+                component_material,
+            )
+        });
         if request.is_none() && !stop {
             engine.stats.unrouted += 1;
             return;
@@ -204,6 +209,7 @@ pub fn ingest_audio_events(
         stream.form_dimension_epoch(),
         &mut engine,
     );
+    let mode = stream.network_id_mode();
     let lookup = network_block_lookup(collisions, stream);
     for event in messages.read() {
         let synchronized_actor_alive = event.actor_synchronization.is_some_and(|owner| {
@@ -232,13 +238,27 @@ pub fn ingest_audio_events(
                 continue;
             }
             protocol::AudioEvent::Level(level) if level.sound_event.starts_with("record.") => {
-                state.record_sound(level, &lookup, &mut engine);
+                state.record_sound(
+                    level,
+                    &lookup,
+                    collisions.and_then(|collisions| {
+                        collisions.block_sound_material(mode, level.data as u32)
+                    }),
+                    &mut engine,
+                );
                 continue;
             }
             protocol::AudioEvent::Level(level) => {
-                let request = engine
-                    .bank()
-                    .and_then(|bank| route::level_sound_request(bank.tables(), level, &lookup));
+                let request = engine.bank().and_then(|bank| {
+                    route::level_sound_request_with_component_material(
+                        bank.tables(),
+                        level,
+                        &lookup,
+                        collisions.and_then(|collisions| {
+                            collisions.block_sound_material(mode, level.data as u32)
+                        }),
+                    )
+                });
                 let admitted = request.is_none()
                     || if event.client_generated {
                         engine.admit_echo(
@@ -368,22 +388,23 @@ pub fn drive_local_motion(
         }
         *last_tick = Some(tick);
         let position = sample.position;
-        let below = identifier_ref(
-            &palette,
-            collisions,
-            mode,
-            [
-                position[0].floor() as i32,
-                (position[1] - FEET_PROBE_BELOW).floor() as i32,
-                position[2].floor() as i32,
-            ],
-        );
+        let below_cell = [
+            position[0].floor() as i32,
+            (position[1] - FEET_PROBE_BELOW).floor() as i32,
+            position[2].floor() as i32,
+        ];
+        let below_runtime_id = palette.primary_runtime_id(below_cell).ok();
+        let below =
+            below_runtime_id.and_then(|runtime_id| collisions.block_identifier(mode, runtime_id));
+        let component_material = below_runtime_id
+            .and_then(|runtime_id| collisions.block_sound_material(mode, runtime_id));
         let cues = motion.advance(sample);
         for cue in cues {
             let request = {
                 let Some(bank) = engine.bank() else { return };
                 let tables = bank.tables();
-                let material = below.and_then(|name| tables.material_of(name));
+                let material =
+                    below.map(|name| tables.material_of_with_component(name, component_material));
                 let (route, volume) = match cue {
                     LocalCue::Step => (
                         material.and_then(|material| tables.interactive(PLAYER, "step", material)),
@@ -625,7 +646,8 @@ pub fn drive_weather_and_particles(
         .as_mut()
         .map(|inbox| inbox.take_level_audio())
         .unwrap_or_default();
-    let lookup = block_lookup(collisions, stream.network_id_mode());
+    let mode = stream.network_id_mode();
+    let lookup = block_lookup(collisions, mode);
     let mut requests: Vec<(Option<[f32; 3]>, SoundRequest)> = Vec::new();
     if let Some(bank) = engine.bank() {
         let tables = bank.tables();
@@ -641,8 +663,16 @@ pub fn drive_weather_and_particles(
         }
         for (id, position, data) in destroyed {
             requests.extend(
-                route::destroy_block_request(tables, id, position, data, &lookup)
-                    .map(|request| (Some(position), request)),
+                route::destroy_block_request_with_component_material(
+                    tables,
+                    id,
+                    position,
+                    data,
+                    &lookup,
+                    collisions
+                        .and_then(|collisions| collisions.block_sound_material(mode, data as u32)),
+                )
+                .map(|request| (Some(position), request)),
             );
         }
     }
@@ -929,7 +959,7 @@ mod tests {
             actor_unique_id: -1,
             fire_at_position: None,
         };
-        state.record_sound(&stop, &|_| None, &mut engine);
+        state.record_sound(&stop, &|_| None, None, &mut engine);
         assert!(sources[0].next().is_none());
         assert!(sources[1].next().is_some());
     }
