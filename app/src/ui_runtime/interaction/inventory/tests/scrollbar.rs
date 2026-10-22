@@ -225,3 +225,30 @@ fn hidden_disabled_and_clipped_scrollbars_do_not_capture_presses() {
         assert!(runtime.screen_state().container_scroll_drag.is_none());
     }
 }
+
+#[test]
+fn releasing_a_moved_thumb_applies_its_final_position() {
+    let mut runtime = UiRuntime::new(1);
+    let frame = frame();
+    assert!(scroll_container(
+        &mut runtime,
+        &frame,
+        [97.0, 25.0],
+        &[],
+        true,
+        false,
+    ));
+    assert!(scroll_container(
+        &mut runtime,
+        &frame,
+        [97.0, 35.0],
+        &[],
+        false,
+        true,
+    ));
+    assert_eq!(
+        runtime.screen_state().container_scroll.get("scroll"),
+        Some(&20.0)
+    );
+    assert!(runtime.screen_state().container_scroll_drag.is_none());
+}
