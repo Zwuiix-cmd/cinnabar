@@ -232,3 +232,44 @@ fn stair_picking_ignores_corner_collision_state() {
         }));
     }
 }
+
+#[test]
+fn lightning_rod_selection_follows_the_facing_axis() {
+    let rods: Vec<_> = fixture()
+        .0
+        .iter()
+        .filter(|record| {
+            assets::facts::block_render_fact(&record.name).kind
+                == assets::facts::BlockRenderKind::LightningRod
+        })
+        .collect();
+    assert!(!rods.is_empty());
+    let mut facings = std::collections::BTreeSet::new();
+    for record in rods {
+        let facing = super::super::state::State::read(record)
+            .unwrap()
+            .number(BlockProperty::FacingDirection)
+            .unwrap();
+        let (min, max) = match facing {
+            0 | 1 => ([0.3125, 0.0, 0.3125], [0.6875, 1.0, 0.6875]),
+            2 | 3 => ([0.3125, 0.3125, 0.0], [0.6875, 0.6875, 1.0]),
+            4 | 5 => ([0.0, 0.3125, 0.3125], [1.0, 0.6875, 0.6875]),
+            _ => panic!("invalid lightning rod facing {facing}"),
+        };
+        let shapes = compile(
+            record,
+            fixture().1.by_sequential_id(record.sequential_id).unwrap(),
+        )
+        .shapes
+        .unwrap();
+        assert_eq!(
+            shapes.selection.as_ref(),
+            [ShapeBox::new(min.map(f64::from), max.map(f64::from))],
+            "{} {}",
+            record.name,
+            record.canonical_state
+        );
+        facings.insert(facing);
+    }
+    assert_eq!(facings, (0..=5).collect());
+}

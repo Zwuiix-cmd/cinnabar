@@ -58,6 +58,11 @@ pub(super) fn shape(record: &RegistryRecord, shapes: ShapeTraits) -> Option<Shap
     if shapes.intersects(ShapeTraits::VISUAL_UNIT | ShapeTraits::END_GATEWAY) {
         return Some(bounds([0.0; 3], [1.0; 3]));
     }
+    if assets::facts::block_render_fact(&record.name).kind
+        == assets::facts::BlockRenderKind::LightningRod
+    {
+        return lightning_rod_shape(record);
+    }
     if record.traits.contains(BlockTraits::STANDING_SIGN) {
         return Some(bounds([0.25, 0.0, 0.25], [0.75, 1.0, 0.75]));
     }
@@ -173,6 +178,22 @@ fn torch_shape(record: &RegistryRecord) -> Option<ShapeBox> {
         "south" => ([0.35, 0.2, 0.7], [0.65, 0.8, 1.0]),
         _ => ([0.4, 0.0, 0.4], [0.6, 0.6, 0.6]),
     };
+    Some(bounds(min, max))
+}
+
+/// Lightning rods keep a six-pixel stem on both axes perpendicular to facing.
+fn lightning_rod_shape(record: &RegistryRecord) -> Option<ShapeBox> {
+    let facing = super::state::State::read(record)?.number(BlockProperty::FacingDirection)?;
+    let axis = match facing {
+        0 | 1 => 1,
+        2 | 3 => 2,
+        4 | 5 => 0,
+        _ => return None,
+    };
+    let mut min = [0.3125; 3];
+    let mut max = [0.6875; 3];
+    min[axis] = 0.0;
+    max[axis] = 1.0;
     Some(bounds(min, max))
 }
 
