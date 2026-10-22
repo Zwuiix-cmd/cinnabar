@@ -46,7 +46,7 @@ use crate::{
     dropped_items::DroppedItemPublisher,
     presentation::{actors::select_actor_presentations, equipment::EquipmentRuntime},
 };
-use bevy::prelude::{Query, Transform, With};
+use bevy::prelude::{Query, Transform, Vec3, With};
 
 /// The exact stream and immutable artwork snapshots borrowed for actor publication.
 pub struct ActorWorld<'a> {
@@ -129,6 +129,22 @@ pub(crate) struct FishingLineAnchor {
 /// `held_sprite_vertices` maps that icon into the held-item frame, whose X axis is mirrored.
 const FISHING_ROD_TIP: [f32; 3] = [-0.90625, 0.90625, 0.0];
 
+fn fishing_line_anchor_for_submission(
+    submission: &render_model::ActorRigSubmission,
+    partial_tick: f32,
+) -> Option<[f32; 3]> {
+    let previous = submission.input.previous_bones.first().copied()?;
+    let current = submission.input.current_bones.first().copied()?;
+    render_model::actor::sampled_bone_offset(
+        FISHING_ROD_TIP,
+        previous,
+        current,
+        submission.world_from_actor,
+        partial_tick,
+    )
+    .map(|anchor| anchor.position)
+}
+
 /// Samples the same root bone used by the held-item layer so a fishing line stays attached while
 /// the hand swings. A missing layer leaves the world-authority fallback untouched.
 fn fishing_line_anchors_for(
@@ -142,21 +158,38 @@ fn fishing_line_anchors_for(
             submission.input.identity.layer == crate::presentation::equipment::LAYER_MAIN_HAND
         })
         .filter_map(|submission| {
-            let previous = submission.input.previous_bones.first().copied()?;
-            let current = submission.input.current_bones.first().copied()?;
-            let anchor = render_model::actor::sampled_bone_offset(
-                FISHING_ROD_TIP,
-                previous,
-                current,
-                submission.world_from_actor,
-                partial_tick,
-            )?;
+            let from = fishing_line_anchor_for_submission(submission, partial_tick)?;
             Some(FishingLineAnchor {
                 runtime_id: submission.input.identity.runtime_id,
-                from: anchor.position,
+                from,
             })
         })
         .collect()
+}
+
+fn camera_space_point_to_world(point: [f32; 3], camera: &Transform) -> Option<[f32; 3]> {
+    let world = camera.to_matrix().transform_point3(Vec3::from_array(point));
+    world.is_finite().then_some(world.to_array())
+}
+
+/// Uses the rendered first-person item rather than the hidden third-person body when the local
+/// player casts a fishing line in first person. The item submission is in camera space, so its
+/// sampled rod tip is mapped back through the same camera transform used by the world pass.
+fn first_person_fishing_line_anchor_for(
+    source: &HandSource,
+    partial_tick: f32,
+    camera: &Transform,
+) -> Option<FishingLineAnchor> {
+    let submissions = source.submissions();
+    let submission = submissions.get(1)?.as_ref()?;
+    if submission.input.identity.layer != crate::presentation::equipment::LAYER_MAIN_HAND {
+        return None;
+    }
+    let from = fishing_line_anchor_for_submission(submission, partial_tick)?;
+    Some(FishingLineAnchor {
+        runtime_id: submission.input.identity.runtime_id,
+        from: camera_space_point_to_world(from, camera)?,
+    })
 }
 
 /// The local player's own first-person rig, built as a single instance placed in camera space.
@@ -428,7 +461,16 @@ pub fn prepare_actor_render_frame(
             &mut batch,
         );
     }
-    let fishing_line_anchors = fishing_line_anchors_for(&batch, step.partial_tick);
+    let mut fishing_line_anchors = fishing_line_anchors_for(&batch, step.partial_tick);
+    if !input.hide_hand
+        && let Ok((camera, _)) = params.presentation.camera.single()
+        && let Some(anchor) = hand_source.as_ref().and_then(|source| {
+            first_person_fishing_line_anchor_for(source, step.partial_tick, camera)
+        })
+    {
+        fishing_line_anchors.retain(|known| known.runtime_id != anchor.runtime_id);
+        fishing_line_anchors.push(anchor);
+    }
     drop(preparation);
     register_geometries(
         &mut params.hand_builder.0,
@@ -577,6 +619,16 @@ mod fishing_line_anchor_tests {
                 runtime_id: 7,
                 from: [9.59375, 20.90625, 30.0],
             }]
+        );
+    }
+
+    #[test]
+    fn first_person_anchor_returns_to_world_through_the_render_camera() {
+        let camera = Transform::from_xyz(10.0, 20.0, 30.0);
+
+        assert_eq!(
+            camera_space_point_to_world([1.0, 2.0, 3.0], &camera),
+            Some([11.0, 22.0, 33.0])
         );
     }
 }
