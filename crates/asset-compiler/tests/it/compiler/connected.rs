@@ -293,7 +293,7 @@ fn compiler_emits_all_sixteen_exact_pane_connection_templates() {
 }
 
 #[test]
-fn compiler_emits_bounded_seventeen_template_fence_groups_by_connection_class() {
+fn compiler_emits_bounded_eighteen_template_fence_groups_by_connection_class() {
     let directory = tempfile::tempdir().expect("create fence fixture");
     write_connected_model_pack(directory.path());
     let records = [
@@ -307,7 +307,7 @@ fn compiler_emits_bounded_seventeen_template_fence_groups_by_connection_class() 
         ),
     ];
     let compiled = compile_pack(directory.path(), &records).expect("compile fences");
-    assert_eq!(compiled.model_templates.len(), 34);
+    assert_eq!(compiled.model_templates.len(), 36);
     for (id, expected_flag) in [
         (0, MODEL_TEMPLATE_FLAG_FENCE_WOOD),
         (1, MODEL_TEMPLATE_FLAG_FENCE_NETHER),
@@ -324,15 +324,42 @@ fn compiler_emits_bounded_seventeen_template_fence_groups_by_connection_class() 
         );
         for mask in 0_u32..16 {
             let arms = compiled.model_templates[(base + 1 + mask) as usize];
-            assert_eq!(arms.flags, expected_flag, "id={id} mask={mask:#06b}");
-            assert_eq!(arms.quad_count, mask.count_ones() * 8);
-            assert!(arms.quad_count <= 32);
-            for rail in template_quads(&compiled, base + 1 + mask)
-                .as_chunks::<4>()
-                .0
-            {
-                let (min, max) = model_bounds(rail);
-                assert!(matches!((min[1], max[1]), (96, 144) | (192, 240)));
+            let expected_head_flags = if mask == 15 {
+                assets::MODEL_TEMPLATE_FLAG_COMPOUND_NEXT
+            } else {
+                expected_flag
+            };
+            assert_eq!(arms.flags, expected_head_flags, "id={id} mask={mask:#06b}");
+            let parts = assets::model_template_parts(&compiled.model_templates, base + 1 + mask)
+                .expect("fence arm template parts");
+            let quad_count: u32 = parts.iter().map(|part| part.quad_count).sum();
+            assert_eq!(quad_count, mask.count_ones() * 10);
+            assert!(parts.len() <= 2);
+            if mask == 15 {
+                assert_eq!(parts[0].flags, assets::MODEL_TEMPLATE_FLAG_COMPOUND_NEXT);
+                assert_eq!(parts[1].flags, 0);
+            } else {
+                assert_eq!(parts.len(), 1);
+            }
+            for (part_index, _part) in parts.iter().enumerate() {
+                for quad in template_quads(&compiled, base + 1 + mask + part_index as u32) {
+                    let min = quad
+                        .positions
+                        .iter()
+                        .map(|position| position[1])
+                        .min()
+                        .unwrap();
+                    let max = quad
+                        .positions
+                        .iter()
+                        .map(|position| position[1])
+                        .max()
+                        .unwrap();
+                    assert!(
+                        (96..=144).contains(&min) && (96..=144).contains(&max)
+                            || (192..=240).contains(&min) && (192..=240).contains(&max)
+                    );
+                }
             }
         }
     }

@@ -10,6 +10,7 @@ use ui::IconRef;
 mod block_model;
 mod shield;
 
+pub(super) use block_model::actor_model as block_actor_model;
 pub(super) use block_model::mesh as block_model;
 
 pub(super) fn shield(

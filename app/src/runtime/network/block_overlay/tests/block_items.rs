@@ -432,6 +432,60 @@ fn authored_inventory_visuals_use_their_own_geometry_and_materials() {
 }
 
 #[test]
+fn carried_fence_gate_inventory_geometry_drops_only_the_display_root_turn() {
+    let geometry = r#"{"format_version":"1.26.50","minecraft:geometry":[{
+        "description":{"identifier":"geometry.fence_gate_carried","texture_width":16,"texture_height":16},
+        "bones":[{"name":"bone","pivot":[0,0,0],"rotation":[0,90,0],"cubes":[
+            {"origin":[6,5,-1],"size":[2,11,2],"uv":[0,0]}
+        ]}]
+    }]}"#;
+    let blocks = CustomBlocks {
+        blocks: vec![block(
+            "fixture:fence_gate",
+            1,
+            CustomBlockVisuals {
+                base: CustomVisualComponents {
+                    geometry: Some("geometry.fence_gate_carried".into()),
+                    materials: materials("gen"),
+                    ..Default::default()
+                },
+                item_visual: Some(CustomVisualComponents {
+                    geometry: Some("geometry.fence_gate_carried".into()),
+                    materials: materials("gen"),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        )]
+        .into(),
+        ..Default::default()
+    };
+    let (compiled, _) = super::super::compile_block_item_overlay(
+        &super::view_with_geometry(geometry.as_bytes()),
+        &blocks,
+        None,
+        assets::MAX_TEXTURE_LAYERS as u32,
+        None,
+        None,
+    )
+    .expect("carried gate overlay");
+    let visual = compiled.overlay.visuals[0];
+    let template = compiled.overlay.model_templates[visual.model_template as usize];
+    let quads = &compiled.overlay.model_quads
+        [template.quad_start as usize..(template.quad_start + template.quad_count) as usize];
+    let mut bounds = [[i16::MAX; 3], [i16::MIN; 3]];
+    for quad in quads {
+        for point in quad.positions {
+            for axis in 0..3 {
+                bounds[0][axis] = bounds[0][axis].min(point[axis]);
+                bounds[1][axis] = bounds[1][axis].max(point[axis]);
+            }
+        }
+    }
+    assert_eq!(bounds, [[0, 80, 112], [32, 256, 144]]);
+}
+
+#[test]
 fn borrowed_base_page_textures_draw_custom_inventory_icons() {
     use super::super::super::item_icons::custom_block_icons;
     let base = RuntimeAssets::diagnostic();

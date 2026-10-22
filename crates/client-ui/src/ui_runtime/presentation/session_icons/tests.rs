@@ -101,6 +101,71 @@ fn block_sheet_items_draw_the_gui_cube_over_their_thumbnail() {
 }
 
 #[test]
+fn authored_custom_block_models_draw_in_creative_inventory_cells() {
+    use ui::{UiNode, UiNodeId, UiPoint, UiRect, UiVisual};
+    let mut presentation =
+        UiPresentationRuntime::new(ui_engine::test_support::fixture_font()).unwrap();
+    presentation.gui_models.enabled = true;
+    let [width, height] = assets::BLOCK_ITEM_SHEET_SIZE.map(u32::from);
+    let icons = Arc::new(SessionIcons {
+        icons: vec![SessionIcon {
+            identifier: Arc::from("test:custom_fence"),
+            metadata: 0,
+            width: 32,
+            height: 32,
+            rgba8: vec![9; 32 * 32 * 4].into(),
+        }],
+        block_sheets: vec![SessionIcon {
+            identifier: Arc::from("test:custom_fence"),
+            metadata: 0,
+            width,
+            height,
+            rgba8: vec![255; (width * height * 4) as usize].into(),
+        }],
+        block_models: BTreeMap::from([(
+            Arc::from("test:custom_fence"),
+            render_model::textured_cube_vertices(render_model::equipment::blocks::face_rects([
+                0.0, 0.0, 1.0, 1.0,
+            ]))
+            .into(),
+        )]),
+        ..Default::default()
+    });
+    observe(&mut presentation, Some(&icons));
+    let icon = presentation.item_icon("test:custom_fence", 0).unwrap();
+    let bounds = UiRect::new(
+        UiPoint::new(0.0, 0.0).unwrap(),
+        UiPoint::new(16.0, 16.0).unwrap(),
+    )
+    .unwrap();
+    let mut nodes =
+        vec![
+            UiNode::new(UiNodeId::new(1), None, bounds).with_visual(UiVisual::Sprite {
+                texture_page: icon.page,
+                uv: icon.uv,
+                color: [255; 4],
+            }),
+        ];
+    presentation.apply_gui_models(&mut nodes);
+    let UiVisual::Mesh(mesh) = nodes[0].visual() else {
+        panic!("an authored custom block model must draw geometry in creative inventory");
+    };
+    assert_eq!(mesh.vertices().len(), 36);
+    assert!(mesh.batches()[0].depth_test && mesh.batches()[0].depth_write);
+    let inside_thumbnail = |[u, v]: [f32; 2]| {
+        u >= f32::from(icon.uv[0])
+            && u <= f32::from(icon.uv[2])
+            && v >= f32::from(icon.uv[1])
+            && v <= f32::from(icon.uv[3])
+    };
+    assert!(
+        mesh.vertices()
+            .iter()
+            .any(|vertex| !inside_thumbnail(vertex.uv))
+    );
+}
+
+#[test]
 fn large_session_icons_install_without_blocking_later_server_ui_textures() {
     let mut player_runtime = player_state::PlayerState::new(1);
 

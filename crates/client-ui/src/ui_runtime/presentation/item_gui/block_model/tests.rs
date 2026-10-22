@@ -86,3 +86,27 @@ fn a_uv_outside_its_tile_keeps_the_thumbnail() {
     wrapped.uvs[2] = [1.5, 1.0];
     assert!(mesh(&[(wrapped, tile(1))]).is_none());
 }
+
+#[test]
+fn carried_actor_models_use_the_full_sheet_and_native_depth() {
+    let source =
+        render_model::textured_cube_vertices(render_model::equipment::blocks::face_rects([
+            0.0, 0.0, 1.0, 1.0,
+        ]));
+    let texture = IconRef {
+        page: 9,
+        uv: [20, 30, 116, 62],
+        glint: false,
+    };
+    let model = actor_model(&source, texture).unwrap();
+    assert_eq!(model.vertices().len(), source.len());
+    assert_eq!(model.indices().len(), source.len());
+    assert_eq!(model.batches().len(), 1);
+    assert_eq!(model.batches()[0].texture_page, texture.page);
+    assert!(model.batches()[0].depth_test && model.batches()[0].depth_write);
+    assert_eq!(model.batches()[0].alpha_cutoff, Some(ALPHA_CUTOFF));
+    assert!(model.vertices().iter().all(|vertex| {
+        (f32::from(texture.uv[0])..=f32::from(texture.uv[2])).contains(&vertex.uv[0])
+            && (f32::from(texture.uv[1])..=f32::from(texture.uv[3])).contains(&vertex.uv[1])
+    }));
+}

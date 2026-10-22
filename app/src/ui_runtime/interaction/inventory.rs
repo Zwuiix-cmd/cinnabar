@@ -272,10 +272,20 @@ pub(super) fn apply_inventory_pointer(
             })
     });
     runtime.screen_state_mut().hover = hit;
-    if let (Some(gui), Some(frame), false) = (gui, presentation.engine_container_frame(), mod_owned)
+    let scrollbar_owned = if let (Some(gui), Some(frame), false) =
+        (gui, presentation.engine_container_frame(), mod_owned)
     {
-        scroll_container(runtime, frame, gui, notches);
-    }
+        scroll_container(
+            runtime,
+            frame,
+            gui,
+            notches,
+            primary_pressed,
+            primary_released,
+        )
+    } else {
+        false
+    };
     for key in presses {
         if key.usage().is_some_and(|code| {
             dispatch_bound_inventory_hotbar(
@@ -294,31 +304,33 @@ pub(super) fn apply_inventory_pointer(
     for control in mouse_hotbar {
         dispatch_bound_inventory_hotbar(menu, control, player_runtime, runtime, hit);
     }
-    let frame = crate::ui_runtime::inventory_drag::PointerFrame {
-        primary_pressed,
-        primary_released,
-        secondary_pressed,
-        secondary_released,
-        shift,
-        holding: runtime
-            .inventory_ledger(player_runtime)
-            .cursor_stack()
-            .is_some(),
-        hit,
-        now_millis,
-    };
-    let actions = runtime.screen_state_mut().pointer.step(frame);
-    for action in actions {
-        let was_open = runtime.inventory_open();
-        runtime.perform_pointer_action(player_runtime, action);
-        if was_open
-            && !runtime.inventory_open()
-            && let Some(focus) = focus.as_deref_mut()
-        {
-            focus.authorize_screen_return();
+    if !scrollbar_owned {
+        let frame = crate::ui_runtime::inventory_drag::PointerFrame {
+            primary_pressed,
+            primary_released,
+            secondary_pressed,
+            secondary_released,
+            shift,
+            holding: runtime
+                .inventory_ledger(player_runtime)
+                .cursor_stack()
+                .is_some(),
+            hit,
+            now_millis,
+        };
+        let actions = runtime.screen_state_mut().pointer.step(frame);
+        for action in actions {
+            let was_open = runtime.inventory_open();
+            runtime.perform_pointer_action(player_runtime, action);
+            if was_open
+                && !runtime.inventory_open()
+                && let Some(focus) = focus.as_deref_mut()
+            {
+                focus.authorize_screen_return();
+            }
         }
     }
-    if hit.is_none() && !mod_owned {
+    if !scrollbar_owned && hit.is_none() && !mod_owned {
         // A held stack clicked off the screen's panels is dropped: all of it
         // on a primary click, one item on a secondary click.
         let outside = gui.is_some_and(|gui| {
@@ -342,14 +354,86 @@ pub(super) fn scroll_container(
     frame: &ui_engine::frame::EngineFrame,
     gui: [f32; 2],
     notches: &[(f32, MouseScrollUnit)],
-) {
+    primary_pressed: bool,
+    primary_released: bool,
+) -> bool {
     let point = [f64::from(gui[0]), f64::from(gui[1])];
+    let drag = runtime.screen_state().container_scroll_drag.clone();
+    if let Some((key, last)) = drag {
+        if primary_released {
+            runtime.screen_state_mut().container_scroll_drag = None;
+            return true;
+        }
+        let Some(view) = frame.hits.iter().find(|view| view.key == key) else {
+            return true;
+        };
+        let Some(metrics) = frame.report.scrolls.get(&key) else {
+            return true;
+        };
+        // `apply_inventory_pointer` clears ButtonInput after routing the frame so a held
+        // physical button cannot leak into gameplay. Once this state exists, the absence of a
+        // release message is the held state for the scrollbar drag.
+        let local = view.local(point);
+        let axis = usize::from(!metrics.horizontal);
+        let at = local[axis];
+        let current = json_ui::ScrollMetrics {
+            offset: runtime
+                .screen_state()
+                .container_scroll
+                .get(&key)
+                .copied()
+                .unwrap_or(metrics.offset),
+            ..metrics.clone()
+        };
+        let offset = current.thumb_drag_target(at - last);
+        runtime
+            .screen_state_mut()
+            .container_scroll
+            .insert(key, offset);
+        runtime.screen_state_mut().container_scroll_drag = Some((view.key.clone(), at));
+        return true;
+    }
     let Some(view) = json_ui::scroll_target(&frame.hits, &frame.report, point) else {
-        return;
+        return false;
     };
     let Some(metrics) = frame.report.scrolls.get(&view.key) else {
-        return;
+        return false;
     };
+    let local = view.local(point);
+    let contains = |rect: Option<[f64; 4]>| {
+        rect.is_some_and(|rect| {
+            local[0] >= rect[0]
+                && local[0] < rect[0] + rect[2]
+                && local[1] >= rect[1]
+                && local[1] < rect[1] + rect[3]
+        })
+    };
+    if primary_pressed && contains(metrics.track) {
+        if contains(metrics.thumb) {
+            let draggable = if metrics.horizontal {
+                matches!(
+                    metrics.box_drag,
+                    json_ui::Draggable::Horizontal | json_ui::Draggable::Both
+                )
+            } else {
+                matches!(
+                    metrics.box_drag,
+                    json_ui::Draggable::Vertical | json_ui::Draggable::Both
+                )
+            };
+            if draggable {
+                let axis = usize::from(!metrics.horizontal);
+                runtime.screen_state_mut().container_scroll_drag =
+                    Some((view.key.clone(), local[axis]));
+            }
+        } else if metrics.track_button.is_some() {
+            runtime
+                .screen_state_mut()
+                .container_scroll
+                .insert(view.key.clone(), metrics.offset_for_track(local));
+        }
+        return true;
+    }
     let mut offset = runtime
         .screen_state()
         .container_scroll
@@ -374,6 +458,7 @@ pub(super) fn scroll_container(
             .container_scroll
             .insert(view.key.clone(), offset);
     }
+    !notches.is_empty()
 }
 
 /// Syncs `swings` to the movement `authority` before swinging for `tick`, so the later swing

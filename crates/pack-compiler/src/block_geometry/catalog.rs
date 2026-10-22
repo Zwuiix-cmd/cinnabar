@@ -237,6 +237,70 @@ mod tests {
         }
     }
 
+    /// The closed Nexly gate's two rotated slats and two centre bars must form one plane.
+    #[test]
+    fn mirrored_y_rotation_keeps_custom_gate_panels_coplanar() {
+        let cube = |origin: [i32; 3], size: [i32; 3], pivot: [f32; 3], rotation: [i32; 3]| {
+            json!({
+                "origin": origin,
+                "size": size,
+                "pivot": pivot,
+                "rotation": rotation,
+                "uv": [0, 0]
+            })
+        };
+        let bones = json!([{
+            "name": "closed_doors",
+            "cubes": [
+                cube([3, 6, -4], [2, 3, 4], [5.0, 10.5, -1.0], [0, 90, 0]),
+                cube([3, 12, -4], [2, 3, 4], [5.0, 10.5, -1.0], [0, 90, 0]),
+                cube([0, 6, -1], [2, 9, 2], [0.0, 0.0, 0.0], [0, 0, 0]),
+                cube([-2, 6, -1], [2, 9, 2], [0.0, 0.0, 0.0], [0, 0, 0]),
+                cube([-5, 12, 0], [2, 3, 4], [-5.0, 10.5, 1.0], [0, 90, 0]),
+                cube([-5, 6, 0], [2, 3, 4], [-5.0, 10.5, 1.0], [0, 90, 0])
+            ]
+        }]);
+        let geometry = parse_bones(&bones, [16.0; 2]);
+        let bounds = geometry
+            .cubes
+            .iter()
+            .map(|cube| {
+                let positions = cube
+                    .quads()
+                    .into_iter()
+                    .flat_map(|(quad, _)| quad.positions)
+                    .collect::<Vec<_>>();
+                let min = [0, 1, 2].map(|axis| {
+                    positions
+                        .iter()
+                        .map(|position| position[axis])
+                        .fold(f32::INFINITY, f32::min)
+                });
+                let max = [0, 1, 2].map(|axis| {
+                    positions
+                        .iter()
+                        .map(|position| position[axis])
+                        .fold(f32::NEG_INFINITY, f32::max)
+                });
+                (min, max)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            bounds
+                .iter()
+                .map(|(min, max)| [0, 1, 2].map(|axis| [min[axis].round(), max[axis].round()]))
+                .collect::<Vec<_>>(),
+            [
+                [[2.0, 6.0], [6.0, 9.0], [7.0, 9.0]],
+                [[2.0, 6.0], [12.0, 15.0], [7.0, 9.0]],
+                [[6.0, 8.0], [6.0, 15.0], [7.0, 9.0]],
+                [[8.0, 10.0], [6.0, 15.0], [7.0, 9.0]],
+                [[10.0, 14.0], [12.0, 15.0], [7.0, 9.0]],
+                [[10.0, 14.0], [6.0, 9.0], [7.0, 9.0]],
+            ]
+        );
+    }
+
     #[test]
     fn inheritance_depth_is_bounded_without_rejecting_the_limit() {
         let mut catalog = BlockGeometryCatalog::default();

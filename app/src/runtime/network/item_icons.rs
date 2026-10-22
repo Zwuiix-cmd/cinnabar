@@ -1,5 +1,4 @@
-//! Session icons for server-defined items: the stack's item_texture.json, and custom block
-//! items drawn as their block.
+//! Session item artwork, with block geometry as the fallback when no item sprite resolves.
 
 use std::{
     collections::{BTreeMap, HashSet},
@@ -25,8 +24,8 @@ use render_model::equipment::blocks::overlay_item;
 const MAX_SESSION_ICONS: usize = protocol::MAX_ITEM_REGISTRY_ENTRIES;
 
 /// Resolves each `(identifier, icon key)` through the item texture catalog merged across the
-/// whole stack, then `textures/items/<key>`; misses are recorded with their reason. Items in
-/// `block_icons` (successes and misses) keep their block rendering instead.
+/// whole stack, then `textures/items/<key>`; misses are recorded with their reason. Resolved
+/// item sprites replace block thumbnails, GUI geometry and held block sheets for that item.
 pub(super) fn compile_session_icons(
     view: &LayeredPackView,
     icon_keys: &[(Arc<str>, Arc<str>)],
@@ -64,30 +63,12 @@ pub(super) fn compile_session_icons(
     };
     let (guessed, explicit): (Vec<_>, Vec<_>) = icon_keys
         .iter()
-        .filter(|(identifier, _)| !block_rendered.contains(identifier))
         .partition(|(identifier, key)| key.as_ref() == short_name(identifier));
     let mut icons = Vec::new();
     let mut retained_bytes = 0;
-    let mut bounded_sheets = Vec::new();
-    append_block_icons(
-        &mut bounded_sheets,
-        block_sheets.into_iter(),
-        &mut retained_bytes,
-    );
-    let block_sheets = bounded_sheets;
+    let mut sprite_items = HashSet::new();
     let mut misses = std::collections::HashMap::new();
-    for (identifier, reason) in block_misses {
-        if misses.len() < MAX_SESSION_ICONS {
-            misses.insert(identifier, reason);
-        }
-    }
-    let explicit_count = explicit.len();
-    let mut block_icons = block_icons.into_iter();
-    for (index, (identifier, key)) in explicit.into_iter().chain(guessed).enumerate() {
-        // Block items rank after explicit icons and before short-name guesses.
-        if index == explicit_count {
-            append_block_icons(&mut icons, block_icons.by_ref(), &mut retained_bytes);
-        }
+    for (identifier, key) in explicit.into_iter().chain(guessed) {
         if icons.len() >= MAX_SESSION_ICONS {
             break;
         }
@@ -107,23 +88,50 @@ pub(super) fn compile_session_icons(
                     let mut sprite = icon(Arc::clone(identifier), texture);
                     sprite.metadata = metadata;
                     retained_bytes += sprite.rgba8.len();
+                    sprite_items.insert(Arc::clone(identifier));
                     icons.push(sprite);
                 }
             }
             Err(reason) => {
                 // A short-name guess that misses is the normal vanilla-item case.
-                if key.as_ref() != short_name(identifier) && misses.len() < MAX_SESSION_ICONS {
+                if !block_rendered.contains(identifier)
+                    && key.as_ref() != short_name(identifier)
+                    && misses.len() < MAX_SESSION_ICONS
+                {
                     misses.insert(Arc::clone(identifier), reason.into_boxed_str());
                 }
             }
         }
     }
-    append_block_icons(&mut icons, block_icons, &mut retained_bytes);
+    let mut bounded_sheets = Vec::new();
+    append_block_icons(
+        &mut bounded_sheets,
+        block_sheets
+            .into_iter()
+            .filter(|sheet| !sprite_items.contains(&sheet.identifier)),
+        &mut retained_bytes,
+    );
+    let block_sheets = bounded_sheets;
+    append_block_icons(
+        &mut icons,
+        block_icons
+            .into_iter()
+            .filter(|icon| !sprite_items.contains(&icon.identifier)),
+        &mut retained_bytes,
+    );
+    for (identifier, reason) in block_misses {
+        if !sprite_items.contains(&identifier) && misses.len() < MAX_SESSION_ICONS {
+            misses.insert(identifier, reason);
+        }
+    }
     vanilla::append(view, &mut icons, &mut retained_bytes);
     (!icons.is_empty() || !block_sheets.is_empty() || !misses.is_empty()).then(|| {
         Arc::new(SessionIcons {
             icons,
-            block_material_flags,
+            block_material_flags: block_material_flags
+                .into_iter()
+                .filter(|(identifier, _)| !sprite_items.contains(identifier))
+                .collect(),
             block_models: block_models
                 .into_iter()
                 .filter(|(identifier, _)| {
@@ -138,7 +146,7 @@ pub(super) fn compile_session_icons(
     })
 }
 
-/// Preserves block icon priority without exceeding the shared retained pixel budget.
+/// Appends block fallback textures without exceeding the shared retained pixel budget.
 fn append_block_icons(
     icons: &mut Vec<SessionIcon>,
     blocks: impl Iterator<Item = SessionIcon>,
