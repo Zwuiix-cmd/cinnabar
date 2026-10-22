@@ -125,9 +125,9 @@ pub(crate) struct FishingLineAnchor {
     pub(crate) from: [f32; 3],
 }
 
-/// The vanilla fishing-rod sprite's tip is the opaque pixel at `(14, 1)` in its 16x16 icon.
+/// The vanilla fishing-rod sprite's tip is the outside corner of its end pixel at `(14, 1)`.
 /// `held_sprite_vertices` maps that icon into the held-item frame, whose X axis is mirrored.
-const FISHING_ROD_TIP: [f32; 3] = [-0.90625, 0.90625, 0.0];
+const FISHING_ROD_TIP: [f32; 3] = [-15.0 / 16.0, 15.0 / 16.0, 0.0];
 
 fn fishing_line_anchor_for_submission(
     submission: &render_model::ActorRigSubmission,
@@ -617,7 +617,7 @@ mod fishing_line_anchor_tests {
             fishing_line_anchors_for(&batch, 0.5).as_slice(),
             &[FishingLineAnchor {
                 runtime_id: 7,
-                from: [9.59375, 20.90625, 30.0],
+                from: [9.5625, 20.9375, 30.0],
             }]
         );
     }
