@@ -466,8 +466,10 @@ pub fn prepare_actor_render_frame(
             }),
             cull_view,
         ),
-        step.partial_tick,
-        &fishing_line_anchors,
+        crate::dropped_items::DroppedItemFrame {
+            partial_tick: step.partial_tick,
+            fishing_line_anchors: &fishing_line_anchors,
+        },
         (
             artwork.item_glint.clone(),
             render_model::ActorGlint {
