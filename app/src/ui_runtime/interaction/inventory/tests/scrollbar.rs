@@ -385,3 +385,18 @@ fn a_release_before_a_new_press_keeps_the_new_scrollbar_drag_held() {
             .any(|offset| *offset > 0.0)
     );
 }
+
+#[test]
+fn a_new_press_replaces_an_older_scrollbar_capture() {
+    let mut runtime = UiRuntime::new(1);
+    runtime.screen_state_mut().container_scroll_drag = Some(("scroll".into(), 25.0));
+    assert!(!scroll_container(
+        &mut runtime,
+        &frame(),
+        [50.0, 50.0],
+        &[],
+        true,
+        false,
+    ));
+    assert!(runtime.screen_state().container_scroll_drag.is_none());
+}

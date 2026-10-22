@@ -365,6 +365,9 @@ pub(super) fn scroll_container(
     primary_released: bool,
 ) -> bool {
     let point = [f64::from(gui[0]), f64::from(gui[1])];
+    if primary_pressed {
+        runtime.screen_state_mut().container_scroll_drag = None;
+    }
     let drag = runtime.screen_state().container_scroll_drag.clone();
     if let Some((key, last)) = drag {
         let Some(view) = frame
