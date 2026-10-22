@@ -405,6 +405,9 @@ OS Alt-Tab acceptance on macOS, Windows and Linux remains incomplete.
   Block-item purchases await an authoritative result preview to retain its block identity.
   Server items whose `minecraft:shooter` draws start a held use that release ends;
   shooters with ammunition entries or `charge_on_draw` remain incomplete.
+  Fishing rods predict a fresh-press swing and choose cast artwork from live hook ownership.
+  Line anchors follow the rendered built-in sprite tip; replacement-art tips, custom attachables
+  and exact cast/retrieve cadence remain incomplete.
   Furnace quick moves retain admitted fuel facts for canonical-empty item descriptors;
   explicit server fuel declarations keep priority. Named station responses retain
   accepted stacks at their window indices. Broader custom-fuel and matched server

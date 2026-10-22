@@ -129,6 +129,7 @@ fn dropped_pack_cubes_replace_all_faces_and_restore_base_after_removal() {
             None,
             (None, None),
             0.0,
+            &[],
             (None, Default::default()),
         );
         let scene = world.resource::<DroppedItemScene>();
@@ -179,6 +180,7 @@ fn dropped_sprites_follow_pack_replacement_at_the_same_atlas_region() {
             None,
             (None, None),
             0.0,
+            &[],
             (None, Default::default()),
         );
         let scene = world.resource::<DroppedItemScene>();
@@ -206,6 +208,7 @@ fn dropped_cube_uses_exact_metadata_without_borrowing_another_variant() {
             None,
             (None, None),
             0.0,
+            &[],
             (None, Default::default()),
         );
         let scene = world.resource::<DroppedItemScene>();

@@ -383,7 +383,7 @@ impl DroppedItemPublisher<'_, '_> {
         collisions: Option<&dyn crate::observations::CollisionLookup>,
         camera: (Option<([f32; 3], f32)>, Option<ActorCullView>),
         partial_tick: f32,
-        fishing_line_anchors: &[crate::actor_publication::FishingLineAnchor],
+        fishing_line_anchors: &[crate::actor_publication::fishing_line::FishingLineAnchor],
         glint: (
             Option<render_model::EquipmentRaster>,
             render_model::ActorGlint,

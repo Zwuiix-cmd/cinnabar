@@ -3,6 +3,7 @@
 
 use actor_animation::AttachableAnimationInput;
 use assets::ItemVisualRoute;
+use assets::facts::FISHING_ROD_IDENTIFIER;
 use chunk_pipeline::WorldStream;
 use client_world::{ActorArmorSnapshot, CanonicalItemStack};
 use protocol::ActorHandedness;
@@ -10,7 +11,6 @@ use protocol::ActorHandedness;
 use super::runtime::{ActorEquipmentInput, HeldKind, WornItem};
 use client_ui::ui_runtime::UiRuntime;
 
-const FISHING_ROD: &str = "minecraft:fishing_rod";
 /// The vanilla `item_texture.json` cast texture is the second fishing-rod variant.
 const FISHING_ROD_CAST_METADATA: u32 = 1;
 
@@ -47,7 +47,8 @@ pub(super) fn worn_item(
         use_facts,
         grip: item.grip,
         identifier: item.identifier.clone()?,
-        metadata: if fishing_rod_cast && item.identifier.as_deref() == Some(FISHING_ROD) {
+        metadata: if fishing_rod_cast && item.identifier.as_deref() == Some(FISHING_ROD_IDENTIFIER)
+        {
             FISHING_ROD_CAST_METADATA
         } else {
             item.identity.metadata
@@ -78,6 +79,7 @@ fn armor_slots(armor: Option<&ActorArmorSnapshot>) -> [Option<WornItem>; 4] {
     .map(|piece| worn_item(&piece.item, piece.dye_rgb, Default::default(), false))
 }
 
+/// Selects cast artwork while the actor owns a tracked hook.
 fn fishing_rod_cast(stream: &WorldStream, runtime_id: u64) -> bool {
     stream
         .authority()
@@ -284,7 +286,7 @@ mod tests {
 
     #[test]
     fn fishing_rod_uses_cast_icon_metadata_only_with_a_live_hook() {
-        let rod = canonical_fixture(FISHING_ROD, false, false);
+        let rod = canonical_fixture(FISHING_ROD_IDENTIFIER, false, false);
         assert_eq!(
             worn_item(&rod, None, Default::default(), false)
                 .unwrap()
