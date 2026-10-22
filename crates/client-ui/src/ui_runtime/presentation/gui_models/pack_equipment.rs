@@ -100,13 +100,26 @@ impl UiPresentationRuntime {
             && self.gui_models.enabled
             && !wanted.is_empty()
         {
+            let worn = pack
+                .worn
+                .iter()
+                .flatten()
+                .map(AsRef::as_ref)
+                .collect::<BTreeSet<_>>();
             let mut textures = wanted
                 .iter()
                 .filter_map(|identifier| catalog.texture(identifier))
                 .collect::<Vec<_>>();
-            // Largest first: big art claims full resolution before small art fills the gaps.
-            textures.sort_by_key(|texture| {
-                std::cmp::Reverse(usize::from(texture.width) * usize::from(texture.height))
+            // Worn armor is visible in every paper-doll view; held models can fall back to 2-D
+            // sprites when the bounded atlas is full. Preserve armor before filling by size.
+            textures.sort_by(|left, right| {
+                worn.contains(right.identifier.as_ref())
+                    .cmp(&worn.contains(left.identifier.as_ref()))
+                    .then_with(|| {
+                        (usize::from(right.width) * usize::from(right.height))
+                            .cmp(&(usize::from(left.width) * usize::from(left.height)))
+                    })
+                    .then_with(|| left.identifier.cmp(&right.identifier))
             });
             let first = self.textures.dynamic_start() + MODEL_PAGE;
             let available = |models: &GuiModels| MODEL_PAGES.saturating_sub(models.pages.len());
