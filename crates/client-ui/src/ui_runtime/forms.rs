@@ -173,6 +173,7 @@ impl ServerFormStore {
                 .as_ref()
                 .is_some_and(|entry| entry.form_id == event.form_id)
             {
+                self.handoff_deadline_millis = None;
                 self.active = None;
                 self.engine = FormEngineState::default();
                 self.replaced_by_reissue = self.replaced_by_reissue.saturating_add(1);
@@ -201,6 +202,7 @@ impl ServerFormStore {
         if entry.kind == FormKind::ServerSettings {
             // A new reply updates this controller, never an earlier unsent answer.
             if self.settings_form_active() {
+                self.handoff_deadline_millis = None;
                 self.active = None;
                 self.engine = FormEngineState::default();
             }
@@ -342,13 +344,14 @@ impl ServerFormStore {
     ) -> Result<(), FormRespondError> {
         self.respond_inner(identity, action, Some(now_millis))
     }
+    /// Retains one answer and optionally keeps its surface for a replacement.
     fn respond_inner(
         &mut self,
         identity: ServerFormIdentity,
         action: LocalFormAction,
         now_millis: Option<u64>,
     ) -> Result<(), FormRespondError> {
-        if !self.pending.is_empty() {
+        if !self.pending.is_empty() || self.handoff_pending() {
             return Err(FormRespondError::PendingResponse);
         }
         let handoff = now_millis.is_some()
@@ -525,13 +528,17 @@ impl ServerFormStore {
     pub fn select_settings_form(&mut self, selected: bool) {
         self.settings_selected = selected;
         if !selected && self.settings_form_active() {
-            self.handoff_deadline_millis = None;
-            self.settings_form = Some(ParkedSettingsForm {
-                entry: self.active.take().unwrap(),
-                engine: std::mem::take(&mut self.engine),
-                focus: self.focus,
-                scroll: self.scroll,
-            });
+            if self.handoff_deadline_millis.take().is_some() {
+                self.active = None;
+                self.engine = FormEngineState::default();
+            } else {
+                self.settings_form = Some(ParkedSettingsForm {
+                    entry: self.active.take().unwrap(),
+                    engine: std::mem::take(&mut self.engine),
+                    focus: self.focus,
+                    scroll: self.scroll,
+                });
+            }
         } else if selected
             && self.active.is_none()
             && self.pending.is_empty()
