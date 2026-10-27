@@ -133,6 +133,17 @@ fn prepare(
         if placement.is_some() && observed.selection.item.count() > 0 {
             local_use = LocalUse::Place;
         }
+        // A predicted placement can become the next ray hit before the release edge reaches
+        // this thread. Do not turn that same press into a container interaction with the block
+        // we just placed; adjacent held placements remain eligible for bridging.
+        if attempt.trigger == ItemUseTrigger::SimulationTick
+            && local_use == LocalUse::Interact
+            && runtime
+                .intention
+                .suppress_post_place_interaction(observed.target.position)
+        {
+            local_use = LocalUse::Nothing;
+        }
         let destination = placement.as_ref().map_or_else(
             || {
                 surroundings

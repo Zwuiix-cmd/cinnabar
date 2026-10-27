@@ -3210,6 +3210,14 @@
       ]
     },
     {
+      "id": "render-hopper",
+      "fact": "render:Hopper",
+      "status": "provisional",
+      "members": [
+        "minecraft:hopper"
+      ]
+    },
+    {
       "id": "render-bubble-column",
       "fact": "render:BubbleColumn",
       "status": "provisional",

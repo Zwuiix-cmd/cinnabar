@@ -208,7 +208,7 @@ pub fn window_kind(kind: WindowKind) -> Option<&'static ContainerKind> {
     );
     const HOPPER: ContainerKind = self::kind(
         "redstone.hopper_screen",
-        "container.hopper",
+        "tile.hopper.name",
         &[("container_items", &FIVE)],
     );
     const DISPENSER: ContainerKind = self::kind(
@@ -405,6 +405,14 @@ mod tests {
         assert_eq!(
             anvil.cell("anvil_material_items", 0).map(Cell::hit),
             Some(InventoryCellHit::Craft(2))
+        );
+    }
+
+    #[test]
+    fn hopper_screen_uses_the_block_name() {
+        assert_eq!(
+            window_kind(WindowKind::Hopper).unwrap().title_key,
+            "tile.hopper.name"
         );
     }
 }
