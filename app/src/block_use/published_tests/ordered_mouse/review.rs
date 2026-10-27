@@ -2,6 +2,9 @@
 use super::*;
 use protocol::test_support::packets::equipment;
 
+#[path = "review/hand_actions.rs"]
+mod hand_actions;
+
 #[path = "equipment.rs"]
 mod equipment_tests;
 
@@ -464,16 +467,45 @@ fn ordered_mouse_review_right_press_interrupts_held_mining_and_places_a_block() 
             .is_some(),
         "right-click must still reach block placement while left-click is held"
     );
+    let packets = captured.drain();
+    let placement = packets
+        .iter()
+        .filter_map(observe_transaction)
+        .find_map(|transaction| transaction.item_use().cloned())
+        .expect("the handoff must send a placement transaction");
+    assert_eq!(placement.position, [4, 2, 6]);
+    assert_eq!(placement.from_position, [4.5, 2.620_01, 8.5]);
+    assert_eq!(
+        placement.trigger,
+        Some(protocol::ItemUseTrigger::PlayerInput)
+    );
+    assert_eq!(placement.face, 3);
     assert!(
-        captured
-            .drain()
-            .iter()
-            .flat_map(protocol::test_support::packets::input_block_actions)
-            .any(|action| {
-                action.0 == protocol::BlockActionKind::AbortDestroy.wire_value()
-                    && action.1 == [4, 2, 6]
-            }),
-        "the handoff must carry an abort for the interrupted destroy"
+        Vec3::from_array(placement.click_position).abs_diff_eq(Vec3::new(0.5, 0.5, 1.0), 1.0e-5)
+    );
+    let abort_index = packets
+        .iter()
+        .position(|packet| {
+            protocol::test_support::packets::input_block_actions(packet)
+                .iter()
+                .any(|action| {
+                    action.0 == protocol::BlockActionKind::AbortDestroy.wire_value()
+                        && action.1 == [4, 2, 6]
+                })
+        })
+        .expect("the handoff must carry an abort for the interrupted destroy");
+    let abort = protocol::player_auth_input_trace_sample(&packets[abort_index]).unwrap();
+    assert_eq!(abort.tick, 103);
+    assert_eq!(abort.position, [4.5, 2.620_01, 8.5]);
+    let placement_index = packets
+        .iter()
+        .position(|packet| {
+            observe_transaction(packet).is_some_and(|transaction| transaction.item_use().is_some())
+        })
+        .unwrap();
+    assert!(
+        placement_index < abort_index,
+        "the immediate press precedes the tick's abort carrier"
     );
 }
 

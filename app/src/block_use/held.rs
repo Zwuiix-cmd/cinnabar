@@ -57,10 +57,15 @@ pub(super) fn maintain_block_use(
     let has_ordered_input = input.ordered.is_some();
     let mut use_phase = context.input.phase(Action::Use);
     if has_ordered_input {
+        use_phase.held = crate::ordered_interactions::build_held(
+            context.ordered.as_deref(),
+            &context.input,
+            Action::Use,
+        );
         use_phase.pressed = false;
         use_phase.released = false;
     }
-    let attacking = crate::ordered_interactions::held(
+    let attacking = crate::ordered_interactions::build_held(
         context.ordered.as_deref(),
         &context.input,
         Action::Attack,

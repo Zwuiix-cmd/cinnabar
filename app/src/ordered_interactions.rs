@@ -162,22 +162,23 @@ pub(crate) fn held(
         return false;
     }
     let ordered = runtime.zip(input.snapshot().and_then(|input| input.ordered.as_ref()));
-    let held = ordered.map_or_else(
+    ordered.map_or_else(
         || input.phase(action).held,
         |(runtime, ordered)| ordered.buttons_at(runtime.ingested).held(action),
-    );
-    // A right-click takes over while both buttons are down. This is also evaluated on
-    // subsequent frames from the event-time held state, so mining cannot immediately resume
-    // just because the left button remains physically pressed.
-    held && (action != Action::Attack
-        || !ordered.is_some_and(|(runtime, ordered)| {
-            ordered.buttons_at(runtime.ingested).held(Action::Use)
-        }))
+    )
 }
 
-/// Reports a right-click press that arrived while the attack button was held.
-pub(crate) fn use_interrupts_attack(edge: ActionEvent) -> bool {
-    edge.action == Action::Use && edge.pressed && edge.buttons.held(Action::Attack)
+/// Reads held mining or placement from the latest hand-action intention.
+/// Item charging continues to read its own use-button state through `held`.
+pub(crate) fn build_held(
+    runtime: Option<&InteractionRuntime>,
+    input: &SemanticInputSnapshot,
+    action: Action,
+) -> bool {
+    held(runtime, input, action)
+        && runtime
+            .zip(input.snapshot().and_then(|input| input.ordered.as_ref()))
+            .is_none_or(|(runtime, _)| runtime.frames.build_action_active(action))
 }
 
 /// Reads unconsumed action events in their original order, unless the batch is quarantined.
@@ -352,7 +353,7 @@ pub(crate) fn drain(world: &mut World, phase: DispatchPhase, windows: &mut Prima
     {
         let mut context = None;
         for edge in tail.iter().copied() {
-            if (accepted_work_pending(world) && !use_interrupts_attack(edge))
+            if accepted_work_pending(world)
                 || !world
                     .resource::<MovementTicker>()
                     .accepts_block_interactions()
@@ -372,6 +373,9 @@ pub(crate) fn drain(world: &mut World, phase: DispatchPhase, windows: &mut Prima
                 break;
             }
             let context = context.get_or_insert_with(|| capture(world, &snapshot, phase));
+            runtime
+                .frames
+                .observe_build_button(edge.action, edge.pressed);
             dispatch(
                 world,
                 InteractionInput {
@@ -388,6 +392,13 @@ pub(crate) fn drain(world: &mut World, phase: DispatchPhase, windows: &mut Prima
         || runtime.frames.quarantined()
     {
         // A blocked suffix expires only at its final opportunity, without replay next frame.
+        if active && !snapshot.authority_released && !runtime.frames.quarantined() {
+            for edge in ordered.events().iter().skip(runtime.ingested) {
+                runtime
+                    .frames
+                    .observe_build_button(edge.action, edge.pressed);
+            }
+        }
         runtime.ingested = ordered.events().len();
         world
             .resource_mut::<ItemUseRuntime>()
