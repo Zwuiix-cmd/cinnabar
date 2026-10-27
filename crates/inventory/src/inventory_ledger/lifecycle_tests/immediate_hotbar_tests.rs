@@ -30,8 +30,17 @@ fn first_frame_hotbar_swap_waits_behind_open_and_survives_transport_pressure() {
                 Ok::<_, &str>(())
             })
             .unwrap();
+        assert_eq!(sent, [open.clone()]);
+        session
+            .ledger_mut()
+            .apply(&InventoryEvent::Open(personal_open(2)));
+        session
+            .flush_inventory_send(21, |packet| {
+                sent.push(packet);
+                Ok::<_, &str>(())
+            })
+            .unwrap();
         assert_eq!(sent.len(), 2);
-        assert_eq!(sent[0], open);
         assert_ne!(sent[1], open);
         assert!(session.ledger().pending_batch().unwrap().is_none());
     }

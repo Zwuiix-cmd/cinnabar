@@ -74,6 +74,19 @@ impl PlayerInventoryLedger {
             .any(|request| request.personal_generation == Some(generation))
     }
 
+    /// Returns whether the server has not acknowledged the personal window yet.
+    ///
+    /// The local screen is intentionally usable during this handshake, but its
+    /// predicted item mutations must remain queued until the server sends its
+    /// `ContainerOpen` event.
+    pub(super) fn personal_open_waiting_for_server(&self) -> bool {
+        self.controls.personal.confirmed.is_none()
+            && matches!(
+                self.personal,
+                Some(PersonalWindow::Opening { .. } | PersonalWindow::Recovering { .. })
+            )
+    }
+
     /// Queues inventory input for the runtime actor selected when the user pressed it.
     pub fn request_personal_open(&mut self, target_runtime_id: u64) -> bool {
         if self.authority.is_none() || target_runtime_id == 0 || self.storage.is_some() {

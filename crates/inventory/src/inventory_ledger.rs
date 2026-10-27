@@ -623,6 +623,20 @@ impl PlayerInventoryLedger {
         if let Some(control) = self.pending_control_packet()? {
             return Ok(Some((control, 1)));
         }
+        // Bedrock opens the player's inventory on the server before accepting any
+        // screen mutations. Keep locally predicted gestures in the queue so the UI
+        // remains responsive, but do not let their packets cross the wire until the
+        // server's ContainerOpen has established the window. World drops are not
+        // screen mutations and retain their normal immediate path.
+        if self.personal_open_waiting_for_server()
+            && self
+                .queue
+                .iter()
+                .find(|pending| pending.state == InventoryPendingState::AwaitingTransport)
+                .is_some_and(|pending| pending.world_drop.is_none())
+        {
+            return Ok(None);
+        }
         if self.authority == Some(InventoryAuthority::Client) {
             return self
                 .legacy_pending_packet()
