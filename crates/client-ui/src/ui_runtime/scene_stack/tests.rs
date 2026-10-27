@@ -185,6 +185,16 @@ fn resource_pack_reload_cover_blocks_gameplay_and_menu_input() {
             .map(|scene| scene.key),
         Some(Scene::ResourcePackLoading)
     );
+
+    // World entry keeps the vanilla loading scene in charge; the pack cover never replaces it.
+    let world_entry = SceneHost {
+        menu: None,
+        over_world: false,
+        loading: Some(ui::LoadingStage::BuildingTerrain),
+    };
+    let scenes = runtime.scenes(&player_runtime, world_entry);
+    assert_eq!(scenes.input_targets(), [Scene::Loading]);
+    assert!(!scenes.contains(Scene::ResourcePackLoading));
 }
 
 // A pack that makes the HUD absorb input takes clicks from gameplay, as vanilla would.
