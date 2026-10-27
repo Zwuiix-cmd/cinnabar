@@ -118,9 +118,22 @@ impl PackReload {
 
     /// Queues a global stack; importing or reordering never touches the network connection.
     pub(crate) fn request_globals(&mut self, stack: Arc<ValidatedPackStack>) -> u64 {
+        self.request_globals_with_cover(stack, true)
+    }
+
+    /// Queues the persisted global stack during startup without showing an in-session cover.
+    pub(crate) fn request_globals_initial(&mut self, stack: Arc<ValidatedPackStack>) -> u64 {
+        self.request_globals_with_cover(stack, false)
+    }
+
+    fn request_globals_with_cover(
+        &mut self,
+        stack: Arc<ValidatedPackStack>,
+        show_cover: bool,
+    ) -> u64 {
         self.globals = stack;
         self.requested_at = Some(Instant::now());
-        self.loading_screen_requested = true;
+        self.loading_screen_requested = show_cover;
         self.revision += 1;
         self.error = None;
         self.revision

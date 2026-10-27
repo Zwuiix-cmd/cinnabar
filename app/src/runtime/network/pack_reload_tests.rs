@@ -221,6 +221,13 @@ fn terrain_identity_only_reload_resummarizes_settled_columns() {
 }
 
 #[test]
+fn initial_global_pack_load_does_not_show_the_in_session_cover() {
+    let mut reload = PackReload::default();
+    reload.request_globals_initial(stack(&[]));
+    assert!(!reload.loading_screen());
+}
+
+#[test]
 fn optional_reload_reuses_unchanged_subscribers_and_removes_absent_ui() {
     let definition = br#"{"namespace":"reload_fixture","panel":{"type":"panel","size":[23,17]}}"#;
     let first = resource_packs::prepare_validated_application(
