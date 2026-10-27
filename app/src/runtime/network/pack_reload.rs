@@ -59,6 +59,9 @@ pub(crate) struct PackReload {
     generation: u64,
     revision: u64,
     applied: u64,
+    /// Whether the current revision was requested by a user-facing global-pack change.
+    /// Session handoffs use the normal world-entry cover instead.
+    loading_screen_requested: bool,
     pending: Option<Pending>,
     ready: Option<Prepared>,
     last_duration: Option<Duration>,
@@ -84,6 +87,7 @@ impl Default for PackReload {
             generation: 0,
             revision: 0,
             applied: 0,
+            loading_screen_requested: false,
             pending: None,
             ready: None,
             last_duration: None,
@@ -116,6 +120,7 @@ impl PackReload {
     pub(crate) fn request_globals(&mut self, stack: Arc<ValidatedPackStack>) -> u64 {
         self.globals = stack;
         self.requested_at = Some(Instant::now());
+        self.loading_screen_requested = true;
         self.revision += 1;
         self.error = None;
         self.revision
@@ -124,6 +129,11 @@ impl PackReload {
     /// The settings host shows this while a worker prepares a replacement.
     pub(crate) fn progress(&self) -> Option<&str> {
         (self.applied != self.revision).then_some("Applying resource packs…")
+    }
+
+    /// Whether a global-pack change needs its own full-screen cover.
+    pub(crate) fn loading_screen(&self) -> bool {
+        self.loading_screen_requested && self.applied != self.revision
     }
 
     /// Reports the latest preparation failure separately from pending work.
@@ -144,6 +154,7 @@ impl PackReload {
     /// Retains server-owned facts while keeping user packs below the server stack.
     pub(super) fn begin_session(&mut self, generation: u64, packs: &PackApplication) {
         self.generation = generation;
+        self.loading_screen_requested = false;
         self.aim_assist_textures = packs.aim_assist_textures.clone();
         self.previous = Some(packs.clone());
         self.previous_assets = None;
@@ -161,6 +172,7 @@ impl PackReload {
     /// Retires server layers; globals remain available in the menus.
     pub(super) fn end_session(&mut self) {
         self.server = resource_pack::validate_handoff(protocol::ResourcePackHandoff::default());
+        self.loading_screen_requested = false;
         self.inputs = Arc::default();
         self.items = None;
         self.generation = 0;
@@ -439,6 +451,7 @@ pub(crate) fn reload_resource_packs(
                             gpu.cancel_except(current.binding_identity());
                             reload.error = Some(error);
                             reload.applied = reload.revision;
+                            reload.loading_screen_requested = false;
                             return;
                         }
                     }
@@ -451,6 +464,7 @@ pub(crate) fn reload_resource_packs(
                             gpu.cancel_except(current.binding_identity());
                             reload.error = Some(error);
                             reload.applied = reload.revision;
+                            reload.loading_screen_requested = false;
                             return;
                         }
                         Some(Ok(())) => {}
@@ -567,6 +581,7 @@ pub(crate) fn reload_resource_packs(
                 reload.applied = prepared.revision;
                 reload.last_duration = Some(prepared.elapsed);
                 reload.error = None;
+                reload.loading_screen_requested = false;
             }
             Some(Ok(_)) | None => {}
             Some(Err(error)) => {
@@ -575,6 +590,7 @@ pub(crate) fn reload_resource_packs(
                 }
                 reload.error = Some(error);
                 reload.applied = reload.revision;
+                reload.loading_screen_requested = false;
             }
         }
     }

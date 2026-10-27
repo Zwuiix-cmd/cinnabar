@@ -262,6 +262,28 @@ impl UiPresentationRuntime {
                             )?;
                         }
                     }
+                    Scene::ResourcePackLoading => {
+                        nodes.push(
+                            UiNode::new(UiNodeId::new(*next), None, viewport).with_visual(
+                                UiVisual::Solid {
+                                    texture_page: self.solid_texture_page,
+                                    color: [8, 10, 14, 255],
+                                },
+                            ),
+                        );
+                        *next = next.saturating_add(1);
+                        self.append_oreui_loading(
+                            LoadingStage::BuildingTerrain,
+                            [
+                                "Applying resource packs…",
+                                "Preparing textures, models and UI…",
+                            ],
+                            nodes,
+                            next,
+                            metrics,
+                            content,
+                        )?;
+                    }
                     Scene::SignEditor => {
                         self.append_sign_editor(
                             runtime,

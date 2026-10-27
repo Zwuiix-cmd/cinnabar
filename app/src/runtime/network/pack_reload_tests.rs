@@ -114,7 +114,9 @@ fn terrain_identity_only_reload_resummarizes_settled_columns() {
     app.world_mut()
         .resource_mut::<PackReload>()
         .request_globals(stack(&[]));
+    assert!(app.world().resource::<PackReload>().loading_screen());
     settle(&mut app, 1);
+    assert!(!app.world().resource::<PackReload>().loading_screen());
     let mut payload = vec![1, 0];
     let sections = protocol::vanilla_dimension_range(0)
         .unwrap()

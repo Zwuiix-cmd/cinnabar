@@ -112,7 +112,8 @@ pub(crate) fn drive_inventory_ui_actions(
     }
     // Presses are this frame's only; modifiers stay held across frames.
     let (presses, shift, control) = runtime.inventory_keys_mut().take_frame();
-    if runtime.credits().owns_input()
+    if runtime.resource_pack_loading()
+        || runtime.credits().owns_input()
         || runtime.server_forms().owns_input()
         || runtime.data_driven_ui().owns_input()
     {
@@ -315,6 +316,15 @@ pub(crate) fn drive_chat_keyboard_input(
         .map(|stream| stream.authority());
     let input_available = driven.is_some()
         || (window.focused && focus.as_ref().is_none_or(|focus| focus.available()));
+    if runtime.resource_pack_loading() {
+        modifiers.reset_all();
+        discard_keyboard(&mut runtime, &mut keyboard_messages, input_available);
+        keys.reset_all();
+        mouse_buttons.reset_all();
+        mouse_motion.delta = Vec2::ZERO;
+        set_cursor_capture(&mut cursor, false);
+        return;
+    }
     if runtime.credits().owns_input() {
         let now = u64::try_from(time.elapsed().as_millis()).unwrap_or(u64::MAX);
         let finished = runtime.credits().active().is_some_and(|active| {
