@@ -1,4 +1,4 @@
-use super::{InventoryPendingState, PlayerInventoryLedger};
+use super::{InventoryPendingState, PendingRequest, PlayerInventoryLedger};
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum PersonalWindow {
@@ -74,17 +74,21 @@ impl PlayerInventoryLedger {
             .any(|request| request.personal_generation == Some(generation))
     }
 
-    /// Returns whether the server has not acknowledged the personal window yet.
-    ///
-    /// The local screen is intentionally usable during this handshake, but its
-    /// predicted item mutations must remain queued until the server sends its
-    /// `ContainerOpen` event.
-    pub(super) fn personal_open_waiting_for_server(&self) -> bool {
+    /// Holds this screen's mutations and close returns until its server window arrives.
+    pub(super) fn personal_request_waits_for_open(&self, request: &PendingRequest) -> bool {
         self.controls.personal.confirmed.is_none()
-            && matches!(
-                self.personal,
-                Some(PersonalWindow::Opening { .. } | PersonalWindow::Recovering { .. })
-            )
+            && self.personal.is_some_and(|personal| {
+                request.personal_generation == Some(personal.generation())
+                    && matches!(
+                        personal,
+                        PersonalWindow::Opening { .. }
+                            | PersonalWindow::Recovering { .. }
+                            | PersonalWindow::Closing {
+                                awaiting_open: true,
+                                ..
+                            }
+                    )
+            })
     }
 
     /// Queues inventory input for the runtime actor selected when the user pressed it.

@@ -623,20 +623,6 @@ impl PlayerInventoryLedger {
         if let Some(control) = self.pending_control_packet()? {
             return Ok(Some((control, 1)));
         }
-        // Bedrock opens the player's inventory on the server before accepting any
-        // screen mutations. Keep locally predicted gestures in the queue so the UI
-        // remains responsive, but do not let their packets cross the wire until the
-        // server's ContainerOpen has established the window. World drops are not
-        // screen mutations and retain their normal immediate path.
-        if self.personal_open_waiting_for_server()
-            && self
-                .queue
-                .iter()
-                .find(|pending| pending.state == InventoryPendingState::AwaitingTransport)
-                .is_some_and(|pending| pending.world_drop.is_none())
-        {
-            return Ok(None);
-        }
         if self.authority == Some(InventoryAuthority::Client) {
             return self
                 .legacy_pending_packet()
@@ -647,12 +633,20 @@ impl PlayerInventoryLedger {
             .iter()
             .filter(|pending| pending.state == InventoryPendingState::AwaitingTransport)
             .peekable();
+        if ready
+            .peek()
+            .is_some_and(|pending| self.personal_request_waits_for_open(pending))
+        {
+            return Ok(None);
+        }
         if let Some(drop) = ready.next_if(|pending| pending.world_drop.is_some()) {
             return self.world_drop_packet(drop).map(|packet| Some((packet, 1)));
         }
         // A later drop leaves in its own packet, after the requests queued before it.
         let requests: Vec<_> = ready
-            .take_while(|pending| pending.world_drop.is_none())
+            .take_while(|pending| {
+                pending.world_drop.is_none() && !self.personal_request_waits_for_open(pending)
+            })
             .map(|pending| {
                 (
                     pending.request_id,
