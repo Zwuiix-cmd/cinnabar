@@ -270,6 +270,14 @@ pub(crate) fn advance(
     if !runtime.may_attempt(tick, plan.local_use, swings) {
         return false;
     }
+    // Ordered presses can reach this path before block maintenance has published the current
+    // movement authority. Synchronize the local counters before admitting the build swing so the
+    // later actor publication keeps the placement animation instead of resetting it as stale.
+    swings.sync_ticks(
+        movement.interaction_authority_identity(),
+        movement.completed_tick(),
+        &context.effects,
+    );
     let start_destination = runtime
         .last_success_destination()
         .is_none()

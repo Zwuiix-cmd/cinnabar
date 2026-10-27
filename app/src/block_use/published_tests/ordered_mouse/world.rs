@@ -142,6 +142,40 @@ fn boundary_fixture() -> (App, client_session::CapturedPackets) {
     (app, captured)
 }
 
+#[test]
+fn ordered_placement_keeps_its_local_swing_when_authority_is_published() {
+    let (mut app, mut captured) = boundary_fixture();
+    super::super::next_slot(app.world_mut());
+    super::super::tap(app.world_mut(), MouseButton::Right);
+    super::before_physics(&mut app);
+    let packets = captured.drain();
+
+    let (authority, completed_tick) = {
+        let movement = app.world().resource::<MovementTicker>();
+        (
+            movement.interaction_authority_identity(),
+            movement.completed_tick(),
+        )
+    };
+    app.world_mut()
+        .resource_scope(|world, mut swings: Mut<SwingTracker>| {
+            let effects = world.resource::<LocalMovementEffectTimeline>();
+            // Actor publication performs this same synchronization after the ordered press. The
+            // admitted placement must still own a started counter at that boundary.
+            swings.sync_ticks(authority, completed_tick, effects);
+            let started = swings.take_started();
+            assert!(
+                started.is_some(),
+                "placement swing must survive authority publication"
+            );
+        });
+
+    let swing = packets
+        .iter()
+        .find_map(protocol::test_support::packets::swing);
+    assert_eq!(swing, Some((42, Some("build".into()))));
+}
+
 /// Admits a selection prefix, then refuses the real placement batch with a full FIFO.
 fn refuse_placement(app: &mut App, captured: &mut client_session::CapturedPackets) {
     fill(app, 7);
