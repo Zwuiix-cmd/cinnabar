@@ -34,6 +34,7 @@ pub(super) fn prepare(
         partial_tick,
         first_person,
         java_mode,
+        java_item_blocking: _,
         combat_visuals: _,
         sampling_camera,
         aspect,

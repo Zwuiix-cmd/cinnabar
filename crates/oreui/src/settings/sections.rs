@@ -84,6 +84,11 @@ fn video(content: &mut Content<'_, '_>) -> Result<(), PaintError> {
     )?;
     options(content, SettingPanel::VideoGeneral)?;
     content.heading(
+        "Java 1.7 combat",
+        "Choose how sword blocking looks and affects movement.",
+    )?;
+    options(content, SettingPanel::VideoAnimations)?;
+    content.heading(
         "menu.video.group.performance",
         "menu.video.group.performance.description",
     )?;

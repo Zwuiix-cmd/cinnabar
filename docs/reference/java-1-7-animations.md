@@ -1,6 +1,6 @@
 # Java 1.7 animations
 
-Video › Animations selects Java 1.7 or Bedrock player poses and held-item animations.
+Video › Java 1.7 combat › Animations selects Java 1.7 or Bedrock player poses and held-item animations.
 New installs and old files without a saved animation preference use Bedrock. Saved
 toggle values migrate: on selects Java 1.7; off selects Bedrock.
 
@@ -9,6 +9,13 @@ motion and glint. Bedrock 1.12 combat visuals are the deliberate default, with n
 user setting. Java keeps its poses, item animation and arm sway. The first-person
 camera keeps the Bedrock eye in both modes, including while crouching, because it
 must stay on the eye ray that picks blocks and actors.
+
+The **Java 1.7 combat** settings keep the blocking details independent: **Item Blocking
+Animation** controls the raised sword pose and held-item transform, **Blocking Slows
+Movement** applies Java's 0.2 movement factor while blocking, and **Keep Sprint While
+Blocking** preserves an active sprint. They default to the Bedrock-compatible combination
+(item blocking on, slowdown off, keep sprint on), and are only active when Java 1.7
+animations are selected.
 
 Code: `render-model::java_animation` (pose, cape and matrix stacks), `actor-animation` `java.rs` (tick motion, retargeting), `client-presentation` `actor_publication/java.rs`, `camera/java.rs` and `equipment/runtime/java.rs`.
 

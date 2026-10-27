@@ -10,6 +10,7 @@ use bevy::{
     prelude::{EulerRot, Res, ResMut, Time, Vec3},
     time::Real,
 };
+use chunk_pipeline::WorldStream;
 use client_runtime::network::NetworkHandle;
 use protocol::PlayerInputMode;
 use semantic_input::Action;
@@ -83,18 +84,36 @@ pub(crate) fn advance_local_physics(
     let analogue_movement = input.analogue_movement();
     let (bevy_yaw, bevy_pitch, _) = view.rotation().to_euler(EulerRot::YXZ);
     let yaw = gameplay::movement::wire_yaw(180.0 - bevy_yaw.to_degrees());
-    let facts = gameplay::movement::local_facts::read(
+    let user_settings = settings
+        .settings
+        .as_deref()
+        .map(|settings| settings.user_settings_update().1);
+    let animation = user_settings.map_or_else(ui::AnimationSettings::default, |settings| {
+        settings.animation
+    });
+    let java_animations = settings.camera.as_deref().map_or_else(
+        || user_settings.is_some_and(|settings| settings.video.java_animations),
+        |camera| camera.feel().java_animations,
+    );
+    let java_blocking = is_java_sword_blocking(
+        player.as_deref(),
+        stream,
+        input.phase(Action::Use).held,
+        java_animations,
+    );
+    let mut facts = gameplay::movement::local_facts::read(
         player.as_deref().map(|player| &**player),
         &client_interaction::movement::world_view::GameplayWorldView(stream),
         item_use
             .as_deref()
             .is_some_and(|item_use| item_use.is_using()),
     );
-    let gameplay = settings
-        .settings
-        .as_deref()
-        .map(|settings| settings.user_settings_update().1.gameplay)
-        .unwrap_or_default();
+    if java_blocking && !animation.keep_sprint_while_blocking {
+        facts.sprint_blocked = true;
+        facts.sprint_start_blocked = true;
+    }
+    let gameplay =
+        user_settings.map_or_else(ui::GameplaySettings::default, |settings| settings.gameplay);
     #[cfg(not(target_arch = "wasm32"))]
     let gameplay = settings
         .mods
@@ -124,7 +143,11 @@ pub(crate) fn advance_local_physics(
         facts,
         item_use_modifier: item_use
             .as_deref()
-            .and_then(|item_use| item_use.movement_modifier()),
+            .and_then(|item_use| item_use.movement_modifier())
+            .or_else(|| {
+                (java_blocking && animation.blocking_slowdown)
+                    .then_some(java_blocking_movement_modifier())
+            }),
         hold: (client_world.dimension_transfer.active() || client_world.respawn.input_held()).then(
             || gameplay::movement::PhysicsFrameHold {
                 registry: collisions.registry(stream.network_id_mode()).identity(),
@@ -179,6 +202,40 @@ pub(crate) fn advance_local_physics(
     publish_physics_view(&physics, &mut view);
 }
 
+/// Java's sword block is a local presentation and movement mode, not a Bedrock item-use action.
+fn is_java_sword_blocking(
+    player: Option<&PlayerRuntime>,
+    stream: &WorldStream,
+    use_held: bool,
+    java_animations: bool,
+) -> bool {
+    java_animations
+        && use_held
+        && player
+            .and_then(|player| {
+                player
+                    .selected_stack()
+                    .or_else(|| player.selected_backing_stack())
+            })
+            .and_then(|stack| stream.authority().canonical_item_stack(stack))
+            .is_some_and(|item| {
+                item.identifier
+                    .as_deref()
+                    .is_some_and(render_model::java_animation::is_java_sword)
+            })
+}
+
+/// Java 1.7 multiplies both movement axes by 0.2 while blocking.
+const JAVA_BLOCKING_MOVEMENT_FACTOR: f64 = 0.2;
+
+/// Converts Java's effective axis factor to the raw item-use modifier expected by Bedrock.
+///
+/// The shared movement path squares item-use modifiers to match Bedrock's wire semantics, while
+/// Java applies its 0.2 factor only once.
+fn java_blocking_movement_modifier() -> f64 {
+    JAVA_BLOCKING_MOVEMENT_FACTOR.sqrt()
+}
+
 /// Publishes retained physics while the shared presentation source resolves visual overrides.
 fn publish_physics_view(physics: &LocalPhysicsController, view: &mut LocalViewPose) {
     if let (Some(eye), Some(feet)) = (
@@ -191,6 +248,7 @@ fn publish_physics_view(physics: &LocalPhysicsController, view: &mut LocalViewPo
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
+    use super::{JAVA_BLOCKING_MOVEMENT_FACTOR, java_blocking_movement_modifier};
     use crate::modding::ModControlModes;
     use gameplay::movement::control_modes::{ControlModes, ControlObservation};
     use std::time::Duration;
@@ -252,5 +310,11 @@ mod tests {
             second_sprint_press(ModControlModes(None).apply(player), false),
             (true, false)
         );
+    }
+
+    #[test]
+    fn java_blocking_modifier_matches_java_axis_factor() {
+        let modifier = java_blocking_movement_modifier();
+        assert!((modifier * modifier - JAVA_BLOCKING_MOVEMENT_FACTOR).abs() < f64::EPSILON);
     }
 }

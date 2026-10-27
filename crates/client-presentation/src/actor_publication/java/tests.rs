@@ -90,6 +90,45 @@ pub(super) fn head_feed() -> client_world::LocalPlayerFeed {
     }
 }
 
+#[test]
+fn item_blocking_preference_keeps_a_using_sword_in_the_normal_grip_when_disabled() {
+    let mut stream = head_stream();
+    let mut feed = head_feed();
+    feed.main_hand = Some("minecraft:iron_sword".into());
+    feed.item_use = client_world::LocalItemUse::Using;
+    stream.sync_local_player_pose(&feed);
+    stream.prepare_actor_appearance_fixture();
+    stream.advance_actor_interpolation_frame(1);
+    let rig = stream.authority().actor_rig(1).unwrap();
+    let actor = stream.authority().actor(1).unwrap();
+
+    assert!(actor.is_using_item());
+    assert_eq!(
+        third_person_input_with_item_blocking(
+            rig,
+            actor,
+            Some("minecraft:iron_sword"),
+            0.0,
+            true,
+            true
+        )
+        .held_right,
+        3
+    );
+    assert_eq!(
+        third_person_input_with_item_blocking(
+            rig,
+            actor,
+            Some("minecraft:iron_sword"),
+            0.0,
+            true,
+            false
+        )
+        .held_right,
+        1
+    );
+}
+
 /// Adds uploaded player geometry and optional animated face layers.
 pub(super) fn uploaded_skin_feed(animated: bool) -> client_world::LocalPlayerFeed {
     let mut feed = head_feed();

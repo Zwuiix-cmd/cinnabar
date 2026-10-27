@@ -62,6 +62,10 @@ impl SettingsOptions {
         settings.video.view_bobbing =
             ui::ViewBobbing::from_value(self.value(SettingId::ViewBobbing));
         settings.video.java_animations = self.value(ANIMATIONS_OPTION.id) == 0;
+        settings.animation.item_blocking = self.value(SettingId::ItemBlockingAnimation) != 0;
+        settings.animation.blocking_slowdown = self.value(SettingId::BlockingSlowdown) != 0;
+        settings.animation.keep_sprint_while_blocking =
+            self.value(SettingId::KeepSprintWhileBlocking) != 0;
         settings.video.show_custom_item_models = self.value(SettingId::ShowCustomItemModels) != 0;
         settings.video.show_other_player_cosmetics =
             self.value(SettingId::ShowOtherPlayerCosmetics) != 0;

@@ -126,6 +126,7 @@ fn publish_overlay(
             local_runtime_id: if local { 2 } else { 1 },
             local_equipment: &input,
             java_posed: &java_posed,
+            java_item_blocking: true,
             combat_visuals: profile,
             local_emote_pose: None,
             remote_emote_poses: &Default::default(),

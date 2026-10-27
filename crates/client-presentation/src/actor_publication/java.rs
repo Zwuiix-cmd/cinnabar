@@ -244,6 +244,7 @@ pub(super) struct Posed {
     pub(super) cape: JavaCapeInput,
 }
 
+#[cfg(test)]
 pub(super) fn third_person<'a>(
     stream: &WorldStream,
     rig: &ActorRigSnapshot<'a>,
@@ -251,6 +252,19 @@ pub(super) fn third_person<'a>(
     local: Option<&ActorEquipmentInput>,
     alpha: f32,
     scratch: &mut PoseScratch,
+) -> Option<ThirdPerson<'a>> {
+    third_person_with_item_blocking(stream, rig, actor, local, alpha, scratch, true)
+}
+
+/// Samples Java's third-person pose with an explicit sword-blocking visual preference.
+pub(super) fn third_person_with_item_blocking<'a>(
+    stream: &WorldStream,
+    rig: &ActorRigSnapshot<'a>,
+    actor: &ActorSnapshot,
+    local: Option<&ActorEquipmentInput>,
+    alpha: f32,
+    scratch: &mut PoseScratch,
+    item_blocking: bool,
 ) -> Option<ThirdPerson<'a>> {
     if rig.java.vanilla_posture
         || render_model::is_pack_rig_id(render_model::EntityRigId(rig.rig.0))
@@ -277,12 +291,13 @@ pub(super) fn third_person<'a>(
         None => remote_input(stream, actor.runtime_id).main,
     }
     .map(|item| item.identifier);
-    let pose = java::java_biped(&third_person_input(
+    let pose = java::java_biped(&third_person_input_with_item_blocking(
         &java_rig,
         actor,
         main.as_deref(),
         alpha,
         local.is_some(),
+        item_blocking,
     ));
     let parts = [0, 1, 2, 3, 4, 5];
     let bones = scratch.retargeted(stream, &java_rig, &pose, &parts, alpha)?;
@@ -375,12 +390,25 @@ pub(super) fn local_death_tilt(
 }
 
 /// Java's pose inputs at the frame for a player holding `main_hand`.
+#[cfg(test)]
 fn third_person_input(
     rig: &ActorRigSnapshot<'_>,
     actor: &ActorSnapshot,
     main_hand: Option<&str>,
     alpha: f32,
     local: bool,
+) -> JavaBipedInput {
+    third_person_input_with_item_blocking(rig, actor, main_hand, alpha, local, true)
+}
+
+/// Java's pose inputs with an explicit sword-blocking visual preference.
+fn third_person_input_with_item_blocking(
+    rig: &ActorRigSnapshot<'_>,
+    actor: &ActorSnapshot,
+    main_hand: Option<&str>,
+    alpha: f32,
+    local: bool,
+    item_blocking: bool,
 ) -> JavaBipedInput {
     let motion = rig.java;
     let (limb_swing, limb_amount) = motion.limb_motion(alpha);
@@ -398,7 +426,7 @@ fn third_person_input(
         riding: motion.riding,
         held_right: match main_hand {
             None => 0,
-            Some(item) if using && is_java_sword(item) => 3,
+            Some(item) if item_blocking && using && is_java_sword(item) => 3,
             Some(_) => 1,
         },
         aimed_bow: using && main_hand == Some(BOW),
