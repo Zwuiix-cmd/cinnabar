@@ -449,6 +449,15 @@ fn ordered_mouse_review_right_press_interrupts_held_mining_and_places_a_block() 
     );
     captured.drain();
 
+    let pick = app
+        .world()
+        .resource::<BlockUseRuntime>()
+        .pick(app.world().resource::<MovementTicker>())
+        .unwrap();
+    let Some(gameplay::block_use::PickResult::Block(block)) = pick.hits.ordinary else {
+        panic!("the mining fixture must retain its camera pick");
+    };
+    let expected_click = Vec3::from_array(block.point) - Vec3::new(4.0, 2.0, 6.0);
     // The left button remains physically held while the right button is pressed.
     mouse_frame(app.world_mut(), MouseButton::Right, &[ButtonState::Pressed]);
     attack_progress_tests::ticks(app.world_mut(), 103, 104);
@@ -480,9 +489,7 @@ fn ordered_mouse_review_right_press_interrupts_held_mining_and_places_a_block() 
         Some(protocol::ItemUseTrigger::PlayerInput)
     );
     assert_eq!(placement.face, 3);
-    assert!(
-        Vec3::from_array(placement.click_position).abs_diff_eq(Vec3::new(0.5, 0.5, 1.0), 1.0e-5)
-    );
+    assert!(Vec3::from_array(placement.click_position).abs_diff_eq(expected_click, 1.0e-5));
     let abort_index = packets
         .iter()
         .position(|packet| {

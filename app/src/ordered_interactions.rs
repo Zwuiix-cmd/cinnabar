@@ -47,6 +47,29 @@ pub(crate) struct InteractionRuntime {
 }
 
 impl InteractionRuntime {
+    /// Preserves an accepted action when ordered input takes over an unordered frame.
+    fn with_existing_build_action(world: &World) -> Self {
+        let mut runtime = Self::default();
+        let action = if world
+            .get_resource::<client_interaction::survival_mining::SurvivalMiningRuntime>()
+            .is_some_and(|mining| mining.destroying_target().is_some())
+        {
+            Some(Action::Attack)
+        } else if world
+            .resource::<BlockUseRuntime>()
+            .last_success_destination()
+            .is_some()
+        {
+            Some(Action::Use)
+        } else {
+            None
+        };
+        if let Some(action) = action {
+            runtime.frames.observe_build_button(action, true);
+        }
+        runtime
+    }
+
     /// Whether the next drain will invalidate world-owned work for this scope.
     pub(crate) fn changes_world(
         &self,
@@ -261,7 +284,7 @@ pub(crate) fn drain(world: &mut World, phase: DispatchPhase, windows: &mut Prima
     let ordered = snapshot.ordered.as_ref().expect("ordered snapshot");
     let mut runtime = world
         .remove_resource::<InteractionRuntime>()
-        .unwrap_or_default();
+        .unwrap_or_else(|| InteractionRuntime::with_existing_build_action(world));
     let authority = world
         .resource::<MovementTicker>()
         .interaction_authority_identity();
