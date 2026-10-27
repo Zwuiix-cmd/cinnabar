@@ -207,8 +207,6 @@ pub struct AnimationSettings {
 }
 
 impl AnimationSettings {
-    /// Java sword blocking scales each movement axis once in float precision.
-    pub const BLOCKING_MOVEMENT_SCALE: f32 = 0.2;
     /// The legacy visual behavior is retained when Java 1.7 animations are selected.
     pub const DEFAULT_ITEM_BLOCKING: bool = true;
     /// Sword blocking preserves ordinary movement until the player enables the override.

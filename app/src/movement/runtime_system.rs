@@ -88,9 +88,9 @@ pub(crate) fn advance_local_physics(
         .settings
         .as_deref()
         .map(|settings| settings.user_settings_update().1);
-    let animation = user_settings.map_or_else(ui::AnimationSettings::default, |settings| {
-        settings.animation
-    });
+    let animation = user_settings
+        .map(|settings| settings.animation)
+        .unwrap_or_default();
     let java_animations = settings.camera.as_deref().map_or_else(
         || user_settings.is_some_and(|settings| settings.video.java_animations),
         |camera| camera.feel().java_animations,
@@ -112,8 +112,9 @@ pub(crate) fn advance_local_physics(
         facts.sprint_blocked = true;
         facts.sprint_start_blocked = true;
     }
-    let gameplay =
-        user_settings.map_or_else(ui::GameplaySettings::default, |settings| settings.gameplay);
+    let gameplay = user_settings
+        .map(|settings| settings.gameplay)
+        .unwrap_or_default();
     #[cfg(not(target_arch = "wasm32"))]
     let gameplay = settings
         .mods
@@ -148,7 +149,7 @@ pub(crate) fn advance_local_physics(
             .or_else(|| {
                 (java_blocking && animation.blocking_slowdown).then_some(
                     gameplay::movement::MovementModifier::InputScale(
-                        ui::AnimationSettings::BLOCKING_MOVEMENT_SCALE,
+                        gameplay::movement::JAVA_BLOCKING_INPUT_SCALE,
                     ),
                 )
             }),

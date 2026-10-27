@@ -40,6 +40,9 @@ pub fn frame_simulates_tick(
         && physics.ticks_due(delta.min(MAX_FRAME_ELAPSED)) > 0
 }
 
+/// The optional Java sword-blocking override scales each travel axis once in float precision.
+pub const JAVA_BLOCKING_INPUT_SCALE: f32 = 0.2;
+
 /// Distinguishes authored item-use values from explicit local movement scales.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MovementModifier {
