@@ -141,12 +141,16 @@ pub(crate) fn advance_local_physics(
         always_sprint: gameplay.always_sprint && input_mode == PlayerInputMode::Mouse,
         toggle_sneak: gameplay.toggle_sneak,
         facts,
-        item_use_modifier: item_use
+        movement_modifier: item_use
             .as_deref()
             .and_then(|item_use| item_use.movement_modifier())
+            .map(gameplay::movement::MovementModifier::ItemUse)
             .or_else(|| {
-                (java_blocking && animation.blocking_slowdown)
-                    .then_some(java_blocking_movement_modifier())
+                (java_blocking && animation.blocking_slowdown).then_some(
+                    gameplay::movement::MovementModifier::InputScale(
+                        ui::AnimationSettings::BLOCKING_MOVEMENT_SCALE,
+                    ),
+                )
             }),
         hold: (client_world.dimension_transfer.active() || client_world.respawn.input_held()).then(
             || gameplay::movement::PhysicsFrameHold {
@@ -225,17 +229,6 @@ fn is_java_sword_blocking(
             })
 }
 
-/// Java 1.7 multiplies both movement axes by 0.2 while blocking.
-const JAVA_BLOCKING_MOVEMENT_FACTOR: f64 = 0.2;
-
-/// Converts Java's effective axis factor to the raw item-use modifier expected by Bedrock.
-///
-/// The shared movement path squares item-use modifiers to match Bedrock's wire semantics, while
-/// Java applies its 0.2 factor only once.
-fn java_blocking_movement_modifier() -> f64 {
-    JAVA_BLOCKING_MOVEMENT_FACTOR.sqrt()
-}
-
 /// Publishes retained physics while the shared presentation source resolves visual overrides.
 fn publish_physics_view(physics: &LocalPhysicsController, view: &mut LocalViewPose) {
     if let (Some(eye), Some(feet)) = (
@@ -248,7 +241,6 @@ fn publish_physics_view(physics: &LocalPhysicsController, view: &mut LocalViewPo
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
-    use super::{JAVA_BLOCKING_MOVEMENT_FACTOR, java_blocking_movement_modifier};
     use crate::modding::ModControlModes;
     use gameplay::movement::control_modes::{ControlModes, ControlObservation};
     use std::time::Duration;
@@ -310,11 +302,5 @@ mod tests {
             second_sprint_press(ModControlModes(None).apply(player), false),
             (true, false)
         );
-    }
-
-    #[test]
-    fn java_blocking_modifier_matches_java_axis_factor() {
-        let modifier = java_blocking_movement_modifier();
-        assert!((modifier * modifier - JAVA_BLOCKING_MOVEMENT_FACTOR).abs() < f64::EPSILON);
     }
 }

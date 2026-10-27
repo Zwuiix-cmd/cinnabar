@@ -429,14 +429,14 @@ settings! {
         [(SettingPanel::VideoCustomization, 7)], [SettingsGroup::Video], None, Some("options.ingamePlayerNames.name");
     ViewBobbing => "view_bobbing", dropdown("options.viewBobbing", VIEW_BOBBING_CHOICES, ui::ViewBobbing::Full as i32),
         [(SettingPanel::VideoAccessibility, 4)], [SettingsGroup::Video], None, None;
-    Animations => "animations", dropdown("Animations", ANIMATION_CHOICES, 1),
+    Animations => "animations", dropdown("Player Animations", ANIMATION_CHOICES, 1),
         [(SettingPanel::VideoAnimations, 0)], [SettingsGroup::Video], None, None;
-    ItemBlockingAnimation => "java_item_blocking", toggle("Item Blocking Animation", ui::AnimationSettings::DEFAULT_ITEM_BLOCKING),
-        [(SettingPanel::VideoAnimations, 1)], [SettingsGroup::Video], None, None;
-    BlockingSlowdown => "java_blocking_slowdown", toggle("Blocking Slows Movement", ui::AnimationSettings::DEFAULT_BLOCKING_SLOWDOWN),
-        [(SettingPanel::VideoAnimations, 2)], [SettingsGroup::Video], None, None;
+    ItemBlockingAnimation => "java_item_blocking", toggle("Sword Blocking Pose", ui::AnimationSettings::DEFAULT_ITEM_BLOCKING),
+        [(SettingPanel::VideoJavaCombat, 0)], [SettingsGroup::Video], None, None;
+    BlockingSlowdown => "java_blocking_slowdown", toggle("Slow Movement While Blocking", ui::AnimationSettings::DEFAULT_BLOCKING_SLOWDOWN),
+        [(SettingPanel::VideoJavaCombat, 1)], [SettingsGroup::Video], None, None;
     KeepSprintWhileBlocking => "java_keep_sprint", toggle("Keep Sprint While Blocking", ui::AnimationSettings::DEFAULT_KEEP_SPRINT_WHILE_BLOCKING),
-        [(SettingPanel::VideoAnimations, 3)], [SettingsGroup::Video], None, None;
+        [(SettingPanel::VideoJavaCombat, 2)], [SettingsGroup::Video], None, None;
     CameraShake => "camera_shake", toggle("options.screenShake", true),
         [(SettingPanel::AccessibilityGameplay, 0), (SettingPanel::VideoAccessibility, 6)], [SettingsGroup::Video, SettingsGroup::Accessibility], None, None;
     TransparentLeaves => "transparent_leaves", toggle("options.transparentleaves", true),

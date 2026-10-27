@@ -260,6 +260,7 @@ fn remote_body_and_persona_publish_sampled_clamps_and_preserve_java_overrides() 
                             None,
                             alpha,
                             &mut java::PoseScratch::default(),
+                            true,
                         )
                         .unwrap();
                         assert_eq!(body.input.previous_bones, expected.bones);

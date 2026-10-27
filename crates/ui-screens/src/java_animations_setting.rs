@@ -3,7 +3,9 @@
 use json_ui::Catalog;
 use serde_json::json;
 
-use launcher::menu::settings_options::{ANIMATION_CHOICES, ANIMATIONS_OPTION, SettingId};
+use launcher::menu::settings_options::{
+    ANIMATION_CHOICES, ANIMATIONS_OPTION, layout::SettingPanel,
+};
 
 /// Adds the Java animation selector and blocking controls after View Bobbing.
 pub fn install(catalog: &mut Catalog) {
@@ -19,25 +21,20 @@ pub fn install(catalog: &mut Catalog) {
             })
         })
         .collect::<Vec<_>>();
-    let blocking_options = [
-        SettingId::ItemBlockingAnimation,
-        SettingId::BlockingSlowdown,
-        SettingId::KeepSprintWhileBlocking,
-    ]
-    .into_iter()
-    .map(|id| {
-        let option = id.definition();
-        json!({
-            format!("{}@settings_common.option_toggle", option.name): {
-                "$option_label": option.label,
-                "$option_binding_name": format!("#{}", option.name),
-                "$option_enabled_binding_name": format!("#{}_enabled", option.name),
-                "$toggle_name": option.name,
-                "$focus_override_right": "FOCUS_OVERRIDE_STOP"
-            }
+    let blocking_options = SettingPanel::VideoJavaCombat
+        .options()
+        .map(|option| {
+            json!({
+                format!("{}@settings_common.option_toggle", option.name): {
+                    "$option_label": option.label,
+                    "$option_binding_name": format!("#{}", option.name),
+                    "$option_enabled_binding_name": format!("#{}_enabled", option.name),
+                    "$toggle_name": option.name,
+                    "$focus_override_right": "FOCUS_OVERRIDE_STOP"
+                }
+            })
         })
-    })
-    .collect::<Vec<_>>();
+        .collect::<Vec<_>>();
     let mut video_controls = vec![json!({
         format!("{name}@settings_common.option_dropdown"): {
             "$option_label": ANIMATIONS_OPTION.label,
@@ -113,12 +110,7 @@ mod tests {
             &section.children[selector],
             ANIMATIONS_OPTION.label
         ));
-        for id in [
-            SettingId::ItemBlockingAnimation,
-            SettingId::BlockingSlowdown,
-            SettingId::KeepSprintWhileBlocking,
-        ] {
-            let option = id.definition();
+        for option in SettingPanel::VideoJavaCombat.options() {
             let position = position(option.name).expect("Java blocking option");
             assert!(position > selector);
             assert!(has_text(&section.children[position], option.label));

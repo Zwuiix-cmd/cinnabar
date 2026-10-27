@@ -84,7 +84,7 @@ pub(super) fn java_bow_frame(use_ticks: u32) -> u32 {
 }
 
 /// Java's first-person hand, using the physics clock for local item use and the actor clock
-/// for equip progress. Sword blocking keeps the actor's use flag.
+/// for equip progress. Sword blocking follows the visual preference without changing actor use.
 pub(super) fn first_person_hand(
     rig: &ActorRigSnapshot<'_>,
     main: Option<&str>,
@@ -92,6 +92,7 @@ pub(super) fn first_person_hand(
     consume_ticks: Option<u32>,
     alpha: f32,
     item_animation: Option<&actor_animation::AttachableAnimationInput<'_>>,
+    item_blocking: bool,
 ) -> JavaHand {
     let [previous, current] = rig.java.equip;
     let (use_ticks, use_alpha) = use_clock(rig.hand[1].use_ticks, alpha, item_animation);
@@ -99,6 +100,9 @@ pub(super) fn first_person_hand(
         swing: rig.java.swing_progress(alpha),
         equip: previous + (current - previous) * alpha,
         using: main.and_then(|item| {
+            if is_java_sword(item) && !item_blocking {
+                return None;
+            }
             let ticks = if is_java_sword(item) {
                 rig.hand[1].use_ticks
             } else {
@@ -244,20 +248,8 @@ pub(super) struct Posed {
     pub(super) cape: JavaCapeInput,
 }
 
-#[cfg(test)]
-pub(super) fn third_person<'a>(
-    stream: &WorldStream,
-    rig: &ActorRigSnapshot<'a>,
-    actor: &ActorSnapshot,
-    local: Option<&ActorEquipmentInput>,
-    alpha: f32,
-    scratch: &mut PoseScratch,
-) -> Option<ThirdPerson<'a>> {
-    third_person_with_item_blocking(stream, rig, actor, local, alpha, scratch, true)
-}
-
 /// Samples Java's third-person pose with an explicit sword-blocking visual preference.
-pub(super) fn third_person_with_item_blocking<'a>(
+pub(super) fn third_person<'a>(
     stream: &WorldStream,
     rig: &ActorRigSnapshot<'a>,
     actor: &ActorSnapshot,
@@ -291,7 +283,7 @@ pub(super) fn third_person_with_item_blocking<'a>(
         None => remote_input(stream, actor.runtime_id).main,
     }
     .map(|item| item.identifier);
-    let pose = java::java_biped(&third_person_input_with_item_blocking(
+    let pose = java::java_biped(&third_person_input(
         &java_rig,
         actor,
         main.as_deref(),
@@ -389,20 +381,8 @@ pub(super) fn local_death_tilt(
     }
 }
 
-/// Java's pose inputs at the frame for a player holding `main_hand`.
-#[cfg(test)]
-fn third_person_input(
-    rig: &ActorRigSnapshot<'_>,
-    actor: &ActorSnapshot,
-    main_hand: Option<&str>,
-    alpha: f32,
-    local: bool,
-) -> JavaBipedInput {
-    third_person_input_with_item_blocking(rig, actor, main_hand, alpha, local, true)
-}
-
 /// Java's pose inputs with an explicit sword-blocking visual preference.
-fn third_person_input_with_item_blocking(
+fn third_person_input(
     rig: &ActorRigSnapshot<'_>,
     actor: &ActorSnapshot,
     main_hand: Option<&str>,
@@ -556,6 +536,7 @@ pub(super) fn hand_source(
     mut inputs: HandInputs<'_>,
     equipment: &mut EquipmentRuntime,
     cache: &mut HandCache,
+    item_blocking: bool,
 ) -> Option<HandSource> {
     let stream = inputs.stream;
     let equipment_input = inputs.equipment_input;
@@ -588,6 +569,7 @@ pub(super) fn hand_source(
         consume_ticks,
         alpha,
         item_animation.as_ref(),
+        item_blocking,
     );
     let retained_equipment = ActorEquipmentInput {
         main: main.clone(),

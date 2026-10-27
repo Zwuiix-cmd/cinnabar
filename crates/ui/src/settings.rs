@@ -202,16 +202,18 @@ pub struct AnimationSettings {
     pub item_blocking: bool,
     /// Applies Java's movement slowdown while a sword is blocking.
     pub blocking_slowdown: bool,
-    /// Keeps an already active sprint while a sword is blocking, matching Bedrock by default.
+    /// Allows ordinary sprinting while holding Use with a sword.
     pub keep_sprint_while_blocking: bool,
 }
 
 impl AnimationSettings {
+    /// Java sword blocking scales each movement axis once in float precision.
+    pub const BLOCKING_MOVEMENT_SCALE: f32 = 0.2;
     /// The legacy visual behavior is retained when Java 1.7 animations are selected.
     pub const DEFAULT_ITEM_BLOCKING: bool = true;
-    /// Bedrock does not slow movement for its use action by default.
+    /// Sword blocking preserves ordinary movement until the player enables the override.
     pub const DEFAULT_BLOCKING_SLOWDOWN: bool = false;
-    /// Bedrock keeps an active sprint while the use action is held.
+    /// Sword blocking preserves ordinary sprint behavior by default.
     pub const DEFAULT_KEEP_SPRINT_WHILE_BLOCKING: bool = true;
 }
 

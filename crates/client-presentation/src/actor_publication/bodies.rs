@@ -246,7 +246,7 @@ pub(super) fn sample<'a>(
                             && !(local && (first_person || input.custom_emote.is_some())))
                         .then(|| {
                             let local = local.then_some(&input.local_equipment);
-                            java::third_person_with_item_blocking(
+                            java::third_person(
                                 stream,
                                 &rig,
                                 actor,

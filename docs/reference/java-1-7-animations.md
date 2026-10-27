@@ -1,6 +1,6 @@
 # Java 1.7 animations
 
-Video › Java 1.7 combat › Animations selects Java 1.7 or Bedrock player poses and held-item animations.
+Video › Animations › Player Animations selects Java 1.7 or Bedrock player poses and held-item animations.
 New installs and old files without a saved animation preference use Bedrock. Saved
 toggle values migrate: on selects Java 1.7; off selects Bedrock.
 
@@ -10,12 +10,17 @@ user setting. Java keeps its poses, item animation and arm sway. The first-perso
 camera keeps the Bedrock eye in both modes, including while crouching, because it
 must stay on the eye ray that picks blocks and actors.
 
-The **Java 1.7 combat** settings keep the blocking details independent: **Item Blocking
-Animation** controls the raised sword pose and held-item transform, **Blocking Slows
-Movement** applies Java's 0.2 movement factor while blocking, and **Keep Sprint While
-Blocking** preserves an active sprint. They default to the Bedrock-compatible combination
-(item blocking on, slowdown off, keep sprint on), and are only active when Java 1.7
-animations are selected.
+Selecting **Java 1.7** reveals three independent sword-blocking options:
+
+- **Sword Blocking Pose** shows the raised sword pose and held-item transform. It changes visuals only.
+- **Slow Movement While Blocking** applies a 0.2 input scale to forward and sideways movement while holding Use with a sword.
+- **Keep Sprint While Blocking** allows sprinting while holding Use with a sword. Turning it off ends an active sprint and prevents starting another until Use is released.
+
+The pose defaults on, slowdown off, and keep sprint on. Movement options change how
+the player moves independently of the pose. They preserve actual item-use effects and
+server movement restrictions. All three options are inactive in Bedrock mode; switching
+styles retains their saved values. Settings search shows the required animation selector
+beside Java-only results so the style can be changed without leaving search.
 
 Code: `render-model::java_animation` (pose, cape and matrix stacks), `actor-animation` `java.rs` (tick motion, retargeting), `client-presentation` `actor_publication/java.rs`, `camera/java.rs` and `equipment/runtime/java.rs`.
 

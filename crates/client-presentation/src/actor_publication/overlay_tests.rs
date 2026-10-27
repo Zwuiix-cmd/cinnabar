@@ -104,6 +104,7 @@ fn publish_overlay(
             local.then_some(&input),
             1.0,
             &mut java::PoseScratch::default(),
+            true,
         )
         .expect("the original player fixture supports Java posing");
         java::apply_pose(&mut body, &third.bones, local, actor, 1.0);
