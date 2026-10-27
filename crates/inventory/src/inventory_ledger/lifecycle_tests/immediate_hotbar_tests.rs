@@ -172,7 +172,7 @@ fn first_frame_hotbar_swap_waits_behind_open_and_survives_transport_pressure() {
                 Ok::<_, &str>(())
             })
             .unwrap();
-        assert_eq!(sent, [open.clone()]);
+        assert_eq!(sent.as_slice(), std::slice::from_ref(&open));
         session
             .ledger_mut()
             .apply(&InventoryEvent::Open(personal_open(2)));
