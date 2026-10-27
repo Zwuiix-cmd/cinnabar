@@ -423,6 +423,61 @@ fn ordered_mouse_review_overflow_drains_an_accepted_block_stop_before_neutral_re
 }
 
 #[test]
+fn ordered_mouse_review_right_press_interrupts_held_mining_and_places_a_block() {
+    let (mut app, mut captured) = app_fixture(8);
+    remove_actor(app.world_mut());
+    set_hotbar_stack(app.world_mut(), 0, Some("minecraft:stone"));
+    app.world_mut()
+        .resource_mut::<client_state::PlayerRuntime>()
+        .facts
+        .publish_player_game_mode(PlayerGameMode::Survival);
+    world_pick_for_setup(app.world_mut());
+
+    mouse_frame(app.world_mut(), MouseButton::Left, &[ButtonState::Pressed]);
+    attack_progress_tests::ticks(app.world_mut(), 102, 103);
+    frame(&mut app);
+    assert_eq!(
+        app.world()
+            .resource::<client_interaction::survival_mining::SurvivalMiningRuntime>()
+            .destroying_target()
+            .map(|(position, _)| position),
+        Some([4, 2, 6]),
+        "the left button must have started mining before the handoff"
+    );
+    captured.drain();
+
+    // The left button remains physically held while the right button is pressed.
+    mouse_frame(app.world_mut(), MouseButton::Right, &[ButtonState::Pressed]);
+    attack_progress_tests::ticks(app.world_mut(), 103, 104);
+    frame(&mut app);
+    assert_eq!(
+        app.world()
+            .resource::<client_interaction::survival_mining::SurvivalMiningRuntime>()
+            .destroying_target(),
+        None,
+        "right-click must abort the active destroy"
+    );
+    assert!(
+        app.world()
+            .resource::<BlockUseRuntime>()
+            .last_success_destination()
+            .is_some(),
+        "right-click must still reach block placement while left-click is held"
+    );
+    assert!(
+        captured
+            .drain()
+            .iter()
+            .flat_map(protocol::test_support::packets::input_block_actions)
+            .any(|action| {
+                action.0 == protocol::BlockActionKind::AbortDestroy.wire_value()
+                    && action.1 == [4, 2, 6]
+            }),
+        "the handoff must carry an abort for the interrupted destroy"
+    );
+}
+
+#[test]
 fn ordered_mouse_review_changed_world_cancels_a_frozen_block_pick() {
     let (mut app, mut captured) = app_fixture(2);
     remove_actor(app.world_mut());

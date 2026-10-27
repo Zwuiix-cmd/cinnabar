@@ -60,7 +60,11 @@ pub(super) fn maintain_block_use(
         use_phase.pressed = false;
         use_phase.released = false;
     }
-    let attacking = context.input.phase(Action::Attack).held;
+    let attacking = crate::ordered_interactions::held(
+        context.ordered.as_deref(),
+        &context.input,
+        Action::Attack,
+    );
     if attacking {
         runtime.clear_press();
     }

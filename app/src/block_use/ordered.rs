@@ -14,7 +14,8 @@ pub(crate) fn press(
     movement: Res<MovementTicker>,
 ) -> bool {
     let pressed = input.edge.pressed;
-    let attacking = input.edge.buttons.held(Action::Attack);
+    let attacking = input.edge.buttons.held(Action::Attack)
+        && !crate::ordered_interactions::use_interrupts_attack(input.edge);
     let now = u64::try_from(context.time.elapsed().as_millis()).unwrap_or(u64::MAX);
     runtime.synchronize(movement.interaction_authority_identity());
     if pressed {
