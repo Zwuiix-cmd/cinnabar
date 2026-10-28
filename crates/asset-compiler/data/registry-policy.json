@@ -6548,7 +6548,7 @@
         "route": "no_draw",
         "renderer": "none",
         "diagnostic": "deferred",
-        "geometry": "diagnostic"
+        "geometry": "model_or_diagnostic"
       },
       "members": [
         "minecraft:hopper"

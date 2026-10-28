@@ -176,6 +176,41 @@ fn ordered_placement_keeps_its_local_swing_when_authority_is_published() {
     assert_eq!(swing, Some((42, Some("build".into()))));
 }
 
+#[test]
+fn ordered_placement_drops_swing_history_from_an_old_authority() {
+    let (mut app, mut captured) = boundary_fixture();
+    let (authority, completed) = {
+        let movement = app.world().resource::<MovementTicker>();
+        (
+            movement.interaction_authority_identity(),
+            movement.completed_tick(),
+        )
+    };
+    app.world_mut()
+        .resource_scope(|world, mut swings: Mut<SwingTracker>| {
+            let effects = world.resource::<LocalMovementEffectTimeline>();
+            swings.sync_ticks(
+                (
+                    authority.0,
+                    simulation_clock::identity::PositionAuthorityGeneration::new(0),
+                ),
+                completed + 100,
+                effects,
+            );
+            swings.published_progress(completed + 100);
+        });
+    super::super::next_slot(app.world_mut());
+    super::super::tap(app.world_mut(), MouseButton::Right);
+    super::before_physics(&mut app);
+    assert!(
+        captured
+            .drain()
+            .iter()
+            .any(|packet| protocol::test_support::packets::swing(packet).is_some()),
+        "an old authority must not delay a new placement swing"
+    );
+}
+
 /// Admits a selection prefix, then refuses the real placement batch with a full FIFO.
 fn refuse_placement(app: &mut App, captured: &mut client_session::CapturedPackets) {
     fill(app, 7);

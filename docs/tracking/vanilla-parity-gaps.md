@@ -221,7 +221,7 @@ animated rig remotes use. All three below flow from that.
   model-shaped crack overlay draw from the `.mcbeben` carrier; all uncompiled, unmeasured and lit by the terrain
   light curve. Filled maps, spawner mob, flower-pot plants, conduit wind cube, brewing-stand
   terrain model and exact bell/lectern/pot dimensions remain open (MED-HIGH). Hopper terrain now
-  has a state-selected native model route; its matched live dimensions and lighting remain unverified.
+  has a state-selected provisional model route; its matched live dimensions and lighting remain unverified.
 - Server resource packs: custom blocks (sequential and hashed ids), item icons, and lang apply at runtime;
   custom entities apply in the neutral material profile only (pack attachables apply to held/worn items on player bodies through a per-session equipment layer; no custom materials, cross-catalog vanilla clip references, or conditional/multi-texture render controllers); pack property defaults seed query.property only when a resource pack carries `entities/` behavior definitions; vanilla-entity retexturing rides the same path when the pack redefines a vanilla identifier; merged pack sounds now feed the audio engine as server overrides (uncompiled) (HIGH).
 - Sky now biome-temperature-derived, fog linear and rain-blended; clouds uncalibrated, End sky from the optional carrier,

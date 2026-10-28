@@ -208,7 +208,7 @@ pub fn window_kind(kind: WindowKind) -> Option<&'static ContainerKind> {
     );
     const HOPPER: ContainerKind = self::kind(
         "redstone.hopper_screen",
-        "tile.hopper.name",
+        "container.hopper",
         &[("container_items", &FIVE)],
     );
     const DISPENSER: ContainerKind = self::kind(
@@ -409,10 +409,10 @@ mod tests {
     }
 
     #[test]
-    fn hopper_screen_uses_the_block_name() {
+    fn hopper_screen_uses_the_container_name() {
         assert_eq!(
             window_kind(WindowKind::Hopper).unwrap().title_key,
-            "tile.hopper.name"
+            "container.hopper"
         );
     }
 }

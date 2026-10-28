@@ -14,7 +14,7 @@ pub(in crate::compiler) fn is_record(record: &RegistryRecord) -> bool {
         && !record.flags.contains(BlockFlags::AIR)
 }
 
-/// Accepts the six native `facing_direction` values used by Bedrock hoppers.
+/// Reads the typed facing selector while allowing unrelated hopper state.
 fn facing(record: &RegistryRecord) -> Option<u8> {
     let state: serde_json::Map<String, serde_json::Value> =
         serde_json::from_str(&record.canonical_state).ok()?;
@@ -56,7 +56,8 @@ pub(in crate::compiler) fn compile_rule(
         template
     };
     set_model_visual(&mut visual, materials, template);
-    visual.support = VisualSupport::Exact;
+    // Keep fallback accounting until dimensional and replacement-pack acceptance is complete.
+    visual.support = VisualSupport::VanillaFallback;
     Ok(CompileRuleResult::Compiled(visual))
 }
 
@@ -74,6 +75,7 @@ struct FaceSpec {
     cullface: Option<BlockFace>,
 }
 
+/// Describes one cuboid face, its texture role and optional neighbour culling.
 const fn face(face: BlockFace, texture: TextureRole, cullface: Option<BlockFace>) -> FaceSpec {
     FaceSpec {
         face,
@@ -82,7 +84,7 @@ const fn face(face: BlockFace, texture: TextureRole, cullface: Option<BlockFace>
     }
 }
 
-/// Emits the reference seven-part hopper model. States 0 and 1 use the vertical
+/// Builds the seven-part hollow bowl and outlet. States 0 and 1 use the vertical
 /// stem; states 2 through 5 use a four-pixel side outlet rotated toward the target face.
 fn hopper_quads(materials: [u32; 6], facing: u8) -> Vec<ModelQuad> {
     let rotation = match facing {
@@ -247,6 +249,7 @@ fn hopper_quads(materials: [u32; 6], facing: u8) -> Vec<ModelQuad> {
     quads
 }
 
+/// Appends selected cuboid faces with rotated positions, materials and culling.
 fn append_box(
     output: &mut Vec<ModelQuad>,
     materials: [u32; 6],
@@ -274,6 +277,7 @@ fn append_box(
     }
 }
 
+/// Turns a model-grid position clockwise around the block centre.
 fn rotate([x, y, z]: [i16; 3], turns: u8) -> [i16; 3] {
     match turns % 4 {
         0 => [x, y, z],
@@ -283,6 +287,7 @@ fn rotate([x, y, z]: [i16; 3], turns: u8) -> [i16; 3] {
     }
 }
 
+/// Applies the same horizontal quarter turns to a material or culling face.
 fn rotate_face(face: BlockFace, turns: u8) -> BlockFace {
     if matches!(face, BlockFace::Down | BlockFace::Up) {
         return face;
@@ -305,6 +310,7 @@ mod tests {
     use super::*;
     use assets::RegistryProvenance;
 
+    /// Creates a primary hopper state without unrelated registry capabilities.
     fn record(state: &str) -> RegistryRecord {
         RegistryRecord {
             beacon_tint: assets::BeaconTint::Unresolved,

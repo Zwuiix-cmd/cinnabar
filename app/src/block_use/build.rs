@@ -267,17 +267,18 @@ pub(crate) fn advance(
         runtime.record(trigger, due, tick, LocalUse::Nothing, clock);
         return false;
     }
-    if !runtime.may_attempt(tick, plan.local_use, swings) {
-        return false;
-    }
-    // Ordered presses can reach this path before block maintenance has published the current
-    // movement authority. Synchronize the local counters before admitting the build swing so the
-    // later actor publication keeps the placement animation instead of resetting it as stale.
-    swings.sync_ticks(
+    // Ordered presses can precede block maintenance. Refresh the authority and selected-item
+    // history before admission so stale publication cannot reject the new placement.
+    swings.sync_ticks_for_item(
         movement.interaction_authority_identity(),
         movement.completed_tick(),
         &context.effects,
+        crate::melee::selected_attack_timing(player_runtime, &context.client_world)
+            .and_then(|timing| timing.swing_duration_ticks),
     );
+    if !runtime.may_attempt(tick, plan.local_use, swings) {
+        return false;
+    }
     let start_destination = runtime
         .last_success_destination()
         .is_none()
