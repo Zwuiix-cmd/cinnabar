@@ -555,7 +555,7 @@ fn png_fixture(
                 UiNode::new(UiNodeId::new(*frame.next), None, viewport).with_visual(
                     UiVisual::Solid {
                         texture_page: frame.solid_page,
-                        color: [8, 10, 14, 255],
+                        color: oreui::loading_screen::RESOURCE_PACK_BACKGROUND,
                     },
                 ),
             );
@@ -565,10 +565,7 @@ fn png_fixture(
                 .paint_loading(
                     oreui::loading_screen::LoadingInput {
                         stage: ui::LoadingStage::BuildingTerrain,
-                        words: [
-                            "Applying resource packs…",
-                            "Preparing textures, models and UI…",
-                        ],
+                        words: oreui::loading_screen::RESOURCE_PACK_WORDS,
                         size,
                         title_artwork: None,
                         destination_icon: None,

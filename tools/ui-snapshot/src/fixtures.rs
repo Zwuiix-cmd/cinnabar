@@ -508,6 +508,12 @@ const STATES: &[State] = &[
         fixture: || Fixture::ResourcePackLoading,
     },
     State {
+        name: "resource-pack-loading-small",
+        size: [640, 360],
+        gui_scale: GUI_SCALE,
+        fixture: || Fixture::ResourcePackLoading,
+    },
+    State {
         name: "disconnect",
         size: SIZE,
         gui_scale: GUI_SCALE,
