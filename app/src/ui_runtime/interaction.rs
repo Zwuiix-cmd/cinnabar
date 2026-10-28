@@ -49,8 +49,8 @@ use client_ui::ui_runtime::interaction::{
     is_chat_edit_shortcut, paste_chat_shortcut,
 };
 use input_capture::{
-    ordered_pointer_presses, restore_gameplay_input_after_chat, suppress_gameplay_input_for_chat,
-    suppress_gameplay_input_for_inventory,
+    discard_keyboard, ordered_pointer_presses, restore_gameplay_input_after_chat,
+    suppress_gameplay_input_for_chat, suppress_gameplay_input_for_inventory,
 };
 
 /// Dispatches inventory hotbar shortcuts bound to one physical press.
@@ -245,28 +245,6 @@ pub(crate) fn inventory_consumes_key(
                 key,
                 KeyCode::ArrowUp | KeyCode::ArrowDown | KeyCode::PageUp | KeyCode::PageDown
             ))
-}
-
-/// Drops keyboard input another owner handles while keeping inventory modifiers in step
-/// with the physical keys: observed edges still update them, and when input is unavailable
-/// (an unfocused window) every modifier counts as released.
-fn discard_keyboard(
-    runtime: &mut UiRuntime,
-    keyboard_messages: &mut MessageReader<KeyboardInput>,
-    input_available: bool,
-) {
-    let inventory_keys = runtime.inventory_keys_mut();
-    if input_available {
-        for input in keyboard_messages.read() {
-            inventory_keys.track_modifier(
-                keyboard_key(input.key_code),
-                input.state == ButtonState::Pressed,
-            );
-        }
-    } else {
-        keyboard_messages.clear();
-        inventory_keys.release_modifiers();
-    }
 }
 
 #[allow(
