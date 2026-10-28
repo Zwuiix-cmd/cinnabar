@@ -98,7 +98,7 @@ fn dressing_room_buttons_open_the_skin_library_and_preserve_profile_routes() {
 
 #[test]
 fn the_version_reads_as_the_release_client_shows_it() {
-    assert_eq!(version_label("1.26.50"), "v26.50");
+    assert_eq!(version_label("1.26.60"), "v26.60");
     assert_eq!(version_label("26.60"), "v26.60");
 }
 
@@ -234,33 +234,6 @@ fn pressed_buttons_map_to_menu_actions() {
         action_for(&view(MenuScreen::Servers), &edit),
         Some(MenuAction::EditSaved(3))
     );
-}
-
-#[test]
-fn java_blocking_bindings_and_clicks_share_the_animation_dependency() {
-    use launcher::menu::settings_options::{SettingId, layout::SettingPanel};
-    let mut view = view(MenuScreen::Settings);
-    for java in [false, true, false] {
-        std::sync::Arc::make_mut(&mut view.settings_options)
-            .set(SettingId::Animations.index(), i32::from(!java));
-        let mut data = DataSource::default();
-        crate::settings_controls::bind_values(
-            &view.settings_options,
-            None,
-            &mut data,
-            &str::to_owned,
-        );
-        for option in SettingPanel::VideoJavaCombat.options() {
-            assert_eq!(
-                data.global_value(&format!("#{}_enabled", option.name)),
-                Some(&Scalar::Bool(java))
-            );
-            let mut hit = region(HitKind::Toggle, None);
-            hit.control_name = Some(option.name.into());
-            let action = crate::settings_controls::action_values(&view.settings_options, &hit);
-            assert_eq!(action.is_some(), java);
-        }
-    }
 }
 
 #[test]

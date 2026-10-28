@@ -391,6 +391,10 @@ execution of this move are unverified, and it adds no parity evidence.
 Session custom-item regressions cover scalar legacy facts and stack limits,
 shared held/preview/dropped block geometry, carried tint and owner-selected
 external armor models. Broader item-action and custom-content parity stays open.
+Shield decoration tests cover metadata, ordered texture composition, stack-specific icons,
+selected artwork and pack replacement. Inventory, preview and held routes retain banner layers;
+dropped/frame models retain their authored geometry and decoration. Custom model-part trees,
+glint shading and full damage-feedback acceptance remain open.
 
 | Field | Evidence |
 |---|---|
@@ -436,6 +440,11 @@ retained alpha/depth/UV behavior. Broader custom-model sidedness remains open.
 | Live/native witness | Not recorded in this row |
 | Performance/resource witness | Not recorded in this row |
 | Final status | Open |
+
+Personal HUD editing belongs to the first-party mod. The host retains generic HUD
+surfaces, bounds, bindings and element visibility, plus the touch-controls editor
+backend. Touch editor placement, history and factory reflow have offline regression
+coverage; this cleanup closes no live HUD acceptance gate.
 
 Attack-category cooldown shading has owning timer and hotbar-publication regressions
 for admission rollback, shared categories and expiry. A local spear jab reproduces
@@ -547,6 +556,16 @@ Ingress uses bounded lookahead and the existing conflict tracker to admit light 
 past stalled terrain. Dependent mutations, dimension changes and transfer barriers stay
 ordered. Latency echoes flush when their movement/control fence clears. Deterministic
 regressions cover these paths; paired hardware join and transfer timings remain open.
+Scene policy reads retain root properties without resolving unused descendants.
+Deterministic coverage checks constant work, warm reuse and catalog/context changes;
+the full cold UI and hardware frame gates remain open.
+Pack publication shares dependency evidence and retires old application
+snapshots off the frame. Clone-work regression coverage does not close the
+resource-pack or hardware performance gates.
+Join workers prepare base entity expression analysis before session publication;
+authoritative and spawner stores share it with independent actor state. Displays
+skip unused item tables, and network stores avoid a discarded initial table. Cold UI,
+pack reload and reference-hardware acceptance remain open.
 
 Cloud preparation skips hidden geometry, prefetches finite windows on workers and
 retains GPU storage. Regression coverage checks admission frames, exact records,

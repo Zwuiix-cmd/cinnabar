@@ -22,7 +22,7 @@ pub struct ActorFrameState {
     pub(super) hat_state: super::hats::HatState,
     pub(super) cape_state: crate::presentation::cape::CapeState,
     pub(super) skin_rigs: crate::presentation::skin_rig::SkinRigCache,
-    pub(super) skin_layers: crate::presentation::skin_layers::SkinLayerCache,
+    pub(super) skin_layers: crate::presentation::skin_layers::ActorLayerCache,
     pub(super) poses: crate::presentation::actors::PoseConversions,
     pub(super) coverage_poses: crate::presentation::actors::PoseConversions,
     pub(super) layer_poses: crate::presentation::entity_layers::LayerPoseCache,
@@ -272,6 +272,8 @@ pub fn advance_actor_frame(
     java_poses.begin_frame();
     if let Some(equipment) = equipment.as_deref_mut() {
         equipment.begin_frame();
+        equipment.begin_shield_frame();
+        equipment.set_show_custom_item_models(settings.feel().show_custom_item_models);
     }
     layer_poses.begin_frame();
     let first_person = settings.perspective() == semantic_input::PerspectiveMode::FirstPerson;
@@ -437,13 +439,7 @@ pub fn advance_actor_frame(
                     ..input
                 });
             *captured_hand_use = (consume_ticks, item_animation);
-            *hand_key = hand::source_key(
-                stream,
-                consume_ticks,
-                item_animation,
-                step.partial_tick,
-                settings.feel().java_item_blocking,
-            );
+            *hand_key = hand::source_key(stream, consume_ticks, item_animation, step.partial_tick);
             equipment.begin_hand_readiness();
             let source = hand::source(
                 hand::HandInputs {
@@ -462,7 +458,6 @@ pub fn advance_actor_frame(
                         .map_or(Mat4::IDENTITY, hand_motion_matrix),
                 },
                 java_mode,
-                settings.feel().java_item_blocking,
                 equipment,
                 java_hand,
             );

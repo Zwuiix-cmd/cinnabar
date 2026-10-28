@@ -55,6 +55,7 @@ impl UiPresentationRuntime {
         #[cfg(feature = "tracy")]
         let _build_span = tracing::info_span!("ui.build").entered();
         dynamic_textures::observe_session(self, runtime.session_id());
+        self.publish_shield_icons();
         session_icons::observe(self, runtime.session_icons());
         self.observe_server_ui(runtime.server_ui());
         self.publish_local_player_identity(runtime.session_id());
@@ -67,9 +68,6 @@ impl UiPresentationRuntime {
         self.menu_seconds = now_millis as f64 / 1_000.0;
         self.nametag_atlas.set_animation_seed(now_millis);
         self.configure_oreui_settings();
-        self.screens
-            .mod_ui
-            .advance_mod_hud_editor_exit(self.menu_seconds);
         if let Some(view) = &self.menu_view {
             self.menu_scrolls.configure_motion(
                 view.settings_options.value(SettingId::ScreenAnimations) != 0,
@@ -251,7 +249,7 @@ impl UiPresentationRuntime {
                                     UiNode::new(UiNodeId::new(*next), None, viewport).with_visual(
                                         UiVisual::Solid {
                                             texture_page: self.solid_texture_page,
-                                            color: [8, 10, 14, 255],
+                                            color: oreui::loading_screen::RESOURCE_PACK_BACKGROUND,
                                         },
                                     ),
                                 );
@@ -261,6 +259,25 @@ impl UiPresentationRuntime {
                                 runtime, stage, nodes, next, metrics, content,
                             )?;
                         }
+                    }
+                    Scene::ResourcePackLoading => {
+                        nodes.push(
+                            UiNode::new(UiNodeId::new(*next), None, viewport).with_visual(
+                                UiVisual::Solid {
+                                    texture_page: self.solid_texture_page,
+                                    color: oreui::loading_screen::RESOURCE_PACK_BACKGROUND,
+                                },
+                            ),
+                        );
+                        *next = next.saturating_add(1);
+                        self.append_oreui_loading(
+                            LoadingStage::BuildingTerrain,
+                            oreui::loading_screen::RESOURCE_PACK_WORDS,
+                            nodes,
+                            next,
+                            metrics,
+                            content,
+                        )?;
                     }
                     Scene::SignEditor => {
                         self.append_sign_editor(

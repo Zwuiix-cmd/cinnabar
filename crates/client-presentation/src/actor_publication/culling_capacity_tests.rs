@@ -319,7 +319,6 @@ impl Caches {
                     partial_tick: alpha,
                     first_person: true,
                     java_mode: false,
-                    java_item_blocking: true,
                     combat_visuals: Default::default(),
                     sampling_camera: Some(([0.0; 2], Vec3::Y.to_array())),
                     aspect: 1.0,
@@ -604,7 +603,7 @@ fn selected_persona_geometry_is_admitted_before_skin_registration() {
         }
         let mut batch =
             select_actor_presentations(sampled.local_runtime_id, false, None, sampled.remotes);
-        let mut layers = crate::presentation::skin_layers::SkinLayerCache::default();
+        let mut layers = crate::presentation::skin_layers::ActorLayerCache::default();
         let _ = layers.apply(
             &mut batch,
             &artwork,
@@ -619,6 +618,7 @@ fn selected_persona_geometry_is_admitted_before_skin_registration() {
             },
             &mut caches.skin_rigs,
             |geometry| geometries.push(geometry),
+            |_, _| None,
         );
         let persona = batch
             .submissions

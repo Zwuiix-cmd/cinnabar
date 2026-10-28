@@ -81,6 +81,8 @@ pub enum Fixture {
         raised: bool,
     },
     Loading(ui::LoadingStage),
+    /// The client-owned cover shown while a resource-pack snapshot is published.
+    ResourcePackLoading,
     Chat {
         draft: &'static str,
         suggestions: Vec<Arc<str>>,
@@ -498,6 +500,18 @@ const STATES: &[State] = &[
         size: SIZE,
         gui_scale: GUI_SCALE,
         fixture: || Fixture::Loading(ui::LoadingStage::BuildingTerrain),
+    },
+    State {
+        name: "resource-pack-loading",
+        size: SIZE,
+        gui_scale: GUI_SCALE,
+        fixture: || Fixture::ResourcePackLoading,
+    },
+    State {
+        name: "resource-pack-loading-small",
+        size: [640, 360],
+        gui_scale: GUI_SCALE,
+        fixture: || Fixture::ResourcePackLoading,
     },
     State {
         name: "disconnect",
@@ -920,7 +934,6 @@ pub fn states() -> impl Iterator<Item = &'static State> {
         .chain(settings_screens::SEARCH_STATES)
         .chain(settings_screens::WORLD_STATES)
         .chain(settings_screens::PAGE_STATES)
-        .chain(settings_screens::JAVA_ANIMATION_STATES)
         .chain(server_forms::STATES)
         .chain(hud_hotbar::STATES)
         .chain(touch_editor::STATES)

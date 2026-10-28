@@ -186,21 +186,11 @@ pub fn prepare_actor_render_frame(
         .step
         .expect("actor preparation precedes final rendering");
     let artwork = state.session_artwork.as_ref().unwrap_or(&params.artwork);
-    if let Some(equipment) = params.equipment.as_deref_mut() {
-        equipment.set_show_custom_item_models(
-            params.presentation.settings.feel().show_custom_item_models,
-        );
-    }
-    let java_item_blocking = {
-        let feel = params.presentation.settings.feel();
-        feel.java_animations && feel.java_item_blocking
-    };
     let view = state.captured_view;
     let pose_view = bodies::PoseView {
         partial_tick: step.partial_tick,
         first_person: state.first_person,
         java_mode: state.java_mode,
-        java_item_blocking,
         combat_visuals: state.combat_visuals,
         sampling_camera: state.captured_sampling_camera,
         aspect: state.captured_aspect,
@@ -319,7 +309,6 @@ pub fn prepare_actor_render_frame(
             local_runtime_id: bodies.local_runtime_id,
             local_equipment: &input.local_equipment,
             java_posed: &bodies.java_posed,
-            java_item_blocking,
             combat_visuals: state.combat_visuals,
             local_emote_pose: bodies.local_emote_pose.as_ref(),
             remote_emote_poses: &bodies.remote_emote_poses,
@@ -346,6 +335,7 @@ pub fn prepare_actor_render_frame(
         &mut new_geometries,
     );
     if let Some(equipment) = params.equipment.as_deref_mut() {
+        equipment.finish_shield_frame();
         new_geometries.extend(equipment.take_pending_geometries());
     }
     state.hat_state.attach(

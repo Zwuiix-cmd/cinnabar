@@ -115,6 +115,36 @@ struct Pool {
     scratch: PreparationScratch,
 }
 
+impl Pool {
+    /// Starts fresh display lifetimes, reusing catalog analysis only for the same asset source.
+    fn replacement(
+        previous: Option<Self>,
+        catalog: actor_animation::ActorAnimationCatalog,
+        session: (u64, i32),
+    ) -> Self {
+        let source = Arc::clone(catalog.assets());
+        let actors = match previous {
+            Some(previous) if Arc::ptr_eq(&previous.source, &source) => {
+                previous.actors.restart(session.1)
+            }
+            _ => DisplayActorStore::new(session.1, catalog),
+        };
+        Self {
+            actors,
+            source,
+            session,
+            pack: None,
+            columns: Default::default(),
+            rescans: Default::default(),
+            spins: Default::default(),
+            poses: Default::default(),
+            layers: Default::default(),
+            listing: None,
+            scratch: PreparationScratch::default(),
+        }
+    }
+}
+
 #[derive(Resource, Default)]
 pub(crate) struct SpawnerDisplayPublisher(Option<Pool>);
 
@@ -291,19 +321,14 @@ pub(crate) fn prepare_spawner_actors(
         .as_ref()
         .is_none_or(|pool| pool.session != session || !Arc::ptr_eq(&pool.source, assets))
     {
-        publisher.0 = Some(Pool {
-            source: Arc::clone(assets),
+        publisher.0 = Some(Pool::replacement(
+            publisher.0.take(),
+            stream
+                .authority()
+                .actor_animation_catalog()
+                .unwrap_or_else(|| actor_animation::ActorAnimationCatalog::new(Arc::clone(assets))),
             session,
-            pack: None,
-            actors: DisplayActorStore::new(session.1, Arc::clone(assets)),
-            columns: Default::default(),
-            rescans: Default::default(),
-            spins: Default::default(),
-            poses: Default::default(),
-            layers: Default::default(),
-            listing: None,
-            scratch: PreparationScratch::default(),
-        });
+        ));
     }
     let pool = publisher.0.as_mut().unwrap();
     let pack_changed = match (&pool.pack, &world.pack_entities) {
